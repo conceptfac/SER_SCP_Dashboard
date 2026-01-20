@@ -82,14 +82,19 @@ const Sidebar: React.FC<SidebarProps> = ({ role, language, onNavigate, activeVie
           <div className="flex items-center justify-between mb-10">
             <div className="flex items-center gap-3">
               <img 
-                src="/imgs/logo.svg" 
+                src="https://raw.githubusercontent.com/conceptfac/SER_SCP_Dashboard/main/imgs/logo.svg" 
                 alt="Logo SCP" 
                 className="h-10 w-auto"
-                style={{ filter: 'invert(1) brightness(10)' }}
+                style={{ 
+                  display: 'block',
+                  maxWidth: '180px',
+                  filter: 'brightness(0) invert(1)' // Força a logo a ficar totalmente branca
+                }}
                 onError={(e) => {
+                  console.error("Erro ao carregar a logo do GitHub");
                   e.currentTarget.style.display = 'none';
                 }}
-              />              
+              />        
             </div>
             <button onClick={onClose} className="lg:hidden text-gray-400 hover:text-white">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>

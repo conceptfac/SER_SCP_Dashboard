@@ -173,20 +173,20 @@ const Contracts: React.FC<ContractsProps> = ({ role, language }) => {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4">
-          <div className="absolute inset-0 bg-secondary/40 backdrop-blur-sm" onClick={() => setShowModal(false)}></div>
+        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
+          <div className="fixed inset-0 bg-secondary/40 backdrop-blur-sm" onClick={() => setShowModal(false)}></div>
           
-          <div className="relative bg-white w-full sm:max-w-5xl h-full sm:h-auto sm:max-h-[95vh] sm:rounded-[2.5rem] shadow-2xl animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 flex flex-col font-sans overflow-hidden">
+          <div className="relative bg-white w-full sm:max-w-5xl h-auto min-h-full sm:min-h-0 sm:max-h-[95vh] sm:rounded-[2.5rem] shadow-2xl animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 flex flex-col font-sans overflow-y-auto sm:overflow-hidden">
             
-            <div className="p-8 flex-1 flex flex-col min-h-0">
-              <div className="flex items-center justify-between mb-8 flex-shrink-0">
+            <div className="p-6 md:p-10 flex-1 flex flex-col">
+              <div className="flex items-center justify-between mb-8">
                 <h3 className="text-2xl font-display font-bold text-secondary uppercase tracking-tighter">Novo Contrato</h3>
                 <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-secondary rounded-full w-10 h-10 flex items-center justify-center hover:bg-gray-100 transition-colors">
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
               </div>
 
-              <div className="flex-shrink-0">
+              <div>
                 <div className="mb-8 p-6 bg-gray-50 border border-gray-100 rounded-[2rem] shadow-inner">
                   <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-3">Pesquisar Cliente pelo Nome (*)</label>
                   <div className="relative">
@@ -203,7 +203,7 @@ const Contracts: React.FC<ContractsProps> = ({ role, language }) => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
                   <div>
                     <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Valor Aporte (*)</label>
                     <input 
@@ -262,22 +262,22 @@ const Contracts: React.FC<ContractsProps> = ({ role, language }) => {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                  <div className="p-5 bg-gray-50 rounded-2xl border border-gray-100 shadow-inner text-center">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                  <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 shadow-inner text-center">
                     <p className="text-[9px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-1">Rendimento</p>
-                    <p className="text-xs font-bold text-secondary uppercase tracking-widest">MENSAL</p>
+                    <p className="text-[10px] font-bold text-secondary uppercase tracking-widest">MENSAL</p>
                   </div>
-                  <div className="p-5 bg-gray-50 rounded-2xl border border-gray-100 shadow-inner text-center">
+                  <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 shadow-inner text-center">
                     <p className="text-[9px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-1">Dia Pagamento</p>
-                    <p className="text-xs font-bold text-secondary uppercase tracking-widest">Todo dia 10</p>
+                    <p className="text-[10px] font-bold text-secondary uppercase tracking-widest">Todo dia 10</p>
                   </div>
-                  <div className="p-5 bg-gray-50 rounded-2xl border border-gray-100 shadow-inner text-center">
+                  <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 shadow-inner text-center">
                     <p className="text-[9px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-1">Segunda Parcela</p>
-                    <p className="text-xs font-bold text-secondary uppercase tracking-widest leading-tight">10 do mês subsequente</p>
+                    <p className="text-[10px] font-bold text-secondary uppercase tracking-widest leading-tight">Mês subsequente</p>
                   </div>
-                  <div className="p-5 bg-primary/5 rounded-2xl border border-primary/10 shadow-inner text-center">
+                  <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 shadow-inner text-center">
                     <p className="text-[9px] font-bold text-primary uppercase tracking-[0.2em] mb-1">Fim do Contrato</p>
-                    <p className="text-xs font-bold text-primary uppercase tracking-widest">
+                    <p className="text-[10px] font-bold text-primary uppercase tracking-widest">
                       {(() => {
                         const d = new Date(startDate + 'T12:00:00');
                         d.setMonth(d.getMonth() + months);
@@ -288,13 +288,13 @@ const Contracts: React.FC<ContractsProps> = ({ role, language }) => {
                 </div>
               </div>
 
-              <div className="flex-1 flex flex-col min-h-0">
-                <h4 className="text-sm font-display font-bold text-secondary uppercase tracking-[0.15em] flex items-center gap-3 mb-4 flex-shrink-0">
+              <div className="flex-1 flex flex-col min-h-0 sm:min-h-[300px]">
+                <h4 className="text-sm font-display font-bold text-secondary uppercase tracking-[0.15em] flex items-center gap-3 mb-4">
                   <span className="w-2.5 h-2.5 bg-primary rounded-full shadow-[0_0_10px_rgba(47,84,160,0.4)]"></span>
                   Mapa de Dividendos
                 </h4>
-                <div className="bg-white border border-gray-100 rounded-[2rem] overflow-hidden shadow-sm flex-1 flex flex-col min-h-0">
-                  <div className="overflow-y-auto flex-1">
+                <div className="bg-white border border-gray-100 rounded-[2rem] overflow-hidden shadow-sm flex-1 flex flex-col">
+                  <div className="overflow-x-auto sm:overflow-y-auto flex-1">
                     <table className="w-full text-left">
                       <thead className="bg-gray-50/80 sticky top-0 z-10 backdrop-blur-md font-display">
                         <tr>
@@ -333,7 +333,7 @@ const Contracts: React.FC<ContractsProps> = ({ role, language }) => {
                 </div>
               </div>
 
-              <div className="mt-8 flex flex-col sm:flex-row justify-end gap-4 border-t border-gray-100 pt-8 flex-shrink-0">
+              <div className="mt-8 flex flex-col sm:flex-row justify-end gap-4 border-t border-gray-100 pt-8 pb-4">
                 <button onClick={() => setShowModal(false)} className="px-10 py-3 text-[11px] font-bold text-bodyText hover:text-secondary uppercase tracking-[0.2em] transition-colors">{t.cancel}</button>
                 <button className="px-20 py-4 bg-buttons text-white rounded-[1.5rem] font-bold shadow-2xl hover:opacity-95 transform transition-all hover:-translate-y-1 text-xs uppercase tracking-[0.2em] active:scale-95">
                   EFETIVAR CONTRATO

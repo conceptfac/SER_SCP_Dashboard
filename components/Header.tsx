@@ -29,12 +29,12 @@ const Header: React.FC<HeaderProps> = ({ user, language, onLanguageChange, onMen
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const getFlag = (lang: Language) => {
+  const getFlagClass = (lang: Language) => {
     switch (lang) {
-      case 'pt-br': return '🇧🇷';
-      case 'en': return '🇺🇸';
-      case 'es': return '🇪🇸';
-      default: return '🌐';
+      case 'pt-br': return 'br';
+      case 'en': return 'us';
+      case 'es': return 'es';
+      default: return 'un';
     }
   };
 
@@ -48,16 +48,8 @@ const Header: React.FC<HeaderProps> = ({ user, language, onLanguageChange, onMen
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7" />
           </svg>
-        </button>
+        </button>    
         
-        <img 
-          src="/imgs/logo.svg" 
-          alt="Logo SCP" 
-          className="h-6 w-auto hidden sm:block mr-2"
-          onError={(e) => {
-            e.currentTarget.style.display = 'none';
-          }}
-        />
 
         <div className="text-gray-400 text-xs md:text-sm font-medium truncate max-w-[150px] md:max-w-none">
           {t.management}
@@ -71,9 +63,7 @@ const Header: React.FC<HeaderProps> = ({ user, language, onLanguageChange, onMen
             onClick={() => setShowLang(!showLang)}
             className="flex items-center gap-2 px-2 md:px-3 py-1.5 hover:bg-gray-50 rounded-full transition-colors"
           >
-            <span className="text-xl md:text-2xl transition-transform hover:scale-110 active:scale-95">
-              {getFlag(language)}
-            </span>
+            <span className={`fi fi-${getFlagClass(language)} text-lg shadow-sm rounded-sm transition-transform hover:scale-110 active:scale-95`}></span>
           </button>
           
           {showLang && (
@@ -82,19 +72,19 @@ const Header: React.FC<HeaderProps> = ({ user, language, onLanguageChange, onMen
                 onClick={() => { onLanguageChange('pt-br'); setShowLang(false); }} 
                 className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 transition-colors ${language === 'pt-br' ? 'bg-primary/5 text-primary font-bold' : 'hover:bg-gray-50 text-secondary'}`}
               >
-                <span className="text-lg">🇧🇷</span> PT-BR
+                <span className="fi fi-br shadow-sm rounded-sm"></span> PT-BR
               </button>
               <button 
                 onClick={() => { onLanguageChange('en'); setShowLang(false); }} 
                 className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 transition-colors ${language === 'en' ? 'bg-primary/5 text-primary font-bold' : 'hover:bg-gray-50 text-secondary'}`}
               >
-                <span className="text-lg">🇺🇸</span> EN
+                <span className="fi fi-us shadow-sm rounded-sm"></span> EN
               </button>
               <button 
                 onClick={() => { onLanguageChange('es'); setShowLang(false); }} 
                 className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 transition-colors ${language === 'es' ? 'bg-primary/5 text-primary font-bold' : 'hover:bg-gray-50 text-secondary'}`}
               >
-                <span className="text-lg">🇪🇸</span> ES
+                <span className="fi fi-es shadow-sm rounded-sm"></span> ES
               </button>
             </div>
           )}
