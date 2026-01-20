@@ -1,0 +1,8 @@
+{
+  "name": "SER - SCP Dashboard Pro",
+  "description": "A high-end SCP (Sociedade em Conta de Participação) management dashboard with role-based access control, multi-language support, and AI-powered image editing features.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
