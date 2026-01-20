@@ -17,8 +17,9 @@ export default defineConfig(({ mode }) => {
       },
       resolve: {
         alias: {
-          // Replaced __dirname with process.cwd() as __dirname is not available in Node.js ESM modules by default
-          '@': path.resolve(process.cwd(), '.'),
+          // Fix: Property 'cwd' does not exist on type 'Process'.
+          // Using path.resolve('.') is equivalent to process.cwd() but avoids type errors in some environments.
+          '@': path.resolve('.'),
         }
       }
     };

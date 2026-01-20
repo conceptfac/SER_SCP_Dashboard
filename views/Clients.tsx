@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Client, Language, UserRole } from '../types';
 import { TRANSLATIONS, BANKS, BRAZILIAN_STATES } from '../constants';
@@ -37,6 +36,9 @@ const Clients: React.FC<ClientsProps> = ({ role, language }) => {
   const [showAddBankModal, setShowAddBankModal] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isPF, setIsPF] = useState(true);
+  const [cepError, setCepError] = useState(false);
+  const [docError, setDocError] = useState(false);
+  const [isSearchingCep, setIsSearchingCep] = useState(false);
   
   const TABS = [t.general, t.address, t.bankData, t.documents, t.statusFlow];
   const [activeTabIndex, setActiveTabIndex] = useState(0);
@@ -58,6 +60,49 @@ const Clients: React.FC<ClientsProps> = ({ role, language }) => {
     cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', estado: ''
   });
 
+  const validateCPF = (cpf: string) => {
+    cpf = cpf.replace(/\D/g, '');
+    if (cpf.length !== 11 || !!cpf.match(/(\d)\1{10}/)) return false;
+    let sum = 0, rest;
+    for (let i = 1; i <= 9; i++) sum = sum + parseInt(cpf.substring(i - 1, i)) * (11 - i);
+    rest = (sum * 10) % 11;
+    if (rest === 10 || rest === 11) rest = 0;
+    if (rest !== parseInt(cpf.substring(9, 10))) return false;
+    sum = 0;
+    for (let i = 1; i <= 10; i++) sum = sum + parseInt(cpf.substring(i - 1, i)) * (12 - i);
+    rest = (sum * 10) % 11;
+    if (rest === 10 || rest === 11) rest = 0;
+    if (rest !== parseInt(cpf.substring(10, 11))) return false;
+    return true;
+  };
+
+  const validateCNPJ = (cnpj: string) => {
+    cnpj = cnpj.replace(/\D/g, '');
+    if (cnpj.length !== 14 || !!cnpj.match(/(\d)\1{13}/)) return false;
+    let size = cnpj.length - 2;
+    let numbers = cnpj.substring(0, size);
+    const digits = cnpj.substring(size);
+    let sum = 0;
+    let pos = size - 7;
+    for (let i = size; i >= 1; i--) {
+      sum += parseInt(numbers.charAt(size - i)) * pos--;
+      if (pos < 2) pos = 9;
+    }
+    let result = sum % 11 < 2 ? 0 : 11 - (sum % 11);
+    if (result !== parseInt(digits.charAt(0))) return false;
+    size = size + 1;
+    numbers = cnpj.substring(0, size);
+    sum = 0;
+    pos = size - 7;
+    for (let i = size; i >= 1; i--) {
+      sum += parseInt(numbers.charAt(size - i)) * pos--;
+      if (pos < 2) pos = 9;
+    }
+    result = sum % 11 < 2 ? 0 : 11 - (sum % 11);
+    if (result !== parseInt(digits.charAt(1))) return false;
+    return true;
+  };
+
   const clients: Client[] = [
     { id: '1', name: 'Fulano da Silva Sauro', document: '123.456.789-00', consultant: 'João Silva', type: 'PF', status: 'Pendente', email: 'fulano@example.com', phone: '11 99999-8888', contracts: [] },
     { id: '2', name: 'Tech Solutions LTDA', document: '12.345.678/0001-99', consultant: 'Maria Santos', type: 'PJ', status: 'Apto', email: 'contato@tech.com', phone: '11 4444-3333', contracts: ['CTR-29382'] },
@@ -66,6 +111,53 @@ const Clients: React.FC<ClientsProps> = ({ role, language }) => {
   const maskCPF = (v: string) => v.replace(/\D/g, '').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2').substring(0, 14);
   const maskCNPJ = (v: string) => v.replace(/\D/g, '').replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d)/, '$1-$2').substring(0, 18);
   const maskCEP = (v: string) => v.replace(/\D/g, '').replace(/(\d{5})(\d)/, '$1-$2').substring(0, 9);
+
+  const handleDocumentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/\D/g, '');
+    const val = isPF ? maskCPF(e.target.value) : maskCNPJ(e.target.value);
+    setFormData({...formData, document: val});
+    
+    if (isPF && raw.length === 11) {
+      setDocError(!validateCPF(raw));
+    } else if (!isPF && raw.length === 14) {
+      setDocError(!validateCNPJ(raw));
+    } else {
+      setDocError(false);
+    }
+  };
+
+  const handleCEPChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawValue = e.target.value.replace(/\D/g, '');
+    const maskedValue = maskCEP(e.target.value);
+    
+    setFormData(prev => ({ ...prev, cep: maskedValue }));
+    setCepError(false);
+
+    if (rawValue.length === 8) {
+      setIsSearchingCep(true);
+      try {
+        const response = await fetch(`https://viacep.com.br/ws/${rawValue}/json/`);
+        const data = await response.json();
+        
+        if (data.erro) {
+          setCepError(true);
+        } else {
+          setFormData(prev => ({
+            ...prev,
+            logradouro: data.logradouro || '',
+            bairro: data.bairro || '',
+            cidade: data.localidade || '',
+            estado: data.uf || ''
+          }));
+        }
+      } catch (error) {
+        console.error("Erro ao buscar CEP:", error);
+        setCepError(true);
+      } finally {
+        setIsSearchingCep(false);
+      }
+    }
+  };
 
   const handleToggleBank = (id: string) => {
     setBankAccounts(bankAccounts.map(acc => ({
@@ -78,6 +170,21 @@ const Clients: React.FC<ClientsProps> = ({ role, language }) => {
     setSelectedClient(client);
     setIsPF(client ? client.type === 'PF' : true);
     setActiveTabIndex(0);
+    setCepError(false);
+    setDocError(false);
+    if (client) {
+      setFormData({
+        name: client.name, document: client.document, email: client.email, phone: client.phone,
+        birthDate: '', foundingDate: '', rg: '', naturalidade: '', estadoCivil: '', profissao: '', 
+        razaoSocial: '', cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', estado: ''
+      });
+    } else {
+      setFormData({
+        name: '', document: '', email: '', phone: '', birthDate: '', foundingDate: '',
+        rg: '', naturalidade: '', estadoCivil: '', profissao: '', razaoSocial: '',
+        cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', estado: ''
+      });
+    }
     setShowModal(true);
   };
 
@@ -171,10 +278,10 @@ const Clients: React.FC<ClientsProps> = ({ role, language }) => {
 
               {!selectedClient && (
                 <div className="flex p-1 bg-gray-100 rounded-xl mb-8 w-full sm:w-fit">
-                  <button onClick={() => setIsPF(true)} className={`flex-1 sm:flex-none px-6 py-2 rounded-lg text-sm font-bold transition-all ${isPF ? 'bg-white text-primary shadow-sm' : 'text-gray-400'}`}>
+                  <button onClick={() => {setIsPF(true); setDocError(false); setFormData({...formData, document: ''})}} className={`flex-1 sm:flex-none px-6 py-2 rounded-lg text-sm font-bold transition-all ${isPF ? 'bg-white text-primary shadow-sm' : 'text-gray-400'}`}>
                     {t.pf}
                   </button>
-                  <button onClick={() => setIsPF(false)} className={`flex-1 sm:flex-none px-6 py-2 rounded-lg text-sm font-bold transition-all ${!isPF ? 'bg-white text-primary shadow-sm' : 'text-gray-400'}`}>
+                  <button onClick={() => {setIsPF(false); setDocError(false); setFormData({...formData, document: ''})}} className={`flex-1 sm:flex-none px-6 py-2 rounded-lg text-sm font-bold transition-all ${!isPF ? 'bg-white text-primary shadow-sm' : 'text-gray-400'}`}>
                     {t.pj}
                   </button>
                 </div>
@@ -194,11 +301,11 @@ const Clients: React.FC<ClientsProps> = ({ role, language }) => {
                     <div className="space-y-4">
                       <div>
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{isPF ? `${t.fullName} (*)` : `${t.companyName} (*)`}</label>
-                        <input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-2 focus:ring-secondary/20" defaultValue={selectedClient?.name} />
+                        <input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-2 focus:ring-secondary/20" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{isPF ? 'RG' : t.businessName}</label>
-                        <input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none" />
+                        <input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none" value={formData.rg} onChange={(e) => setFormData({...formData, rg: e.target.value})} />
                       </div>
                       <DatePicker 
                         label={isPF ? `${t.birthDate} (*)` : 'Data de fundação (*)'}
@@ -209,33 +316,34 @@ const Clients: React.FC<ClientsProps> = ({ role, language }) => {
                     </div>
                     <div className="space-y-4">
                       <div>
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{isPF ? 'CPF (*)' : `${t.cnpj} (*)`}</label>
+                        <label className={`block text-[10px] font-bold uppercase mb-1 ${docError ? 'text-red-500' : 'text-gray-400'}`}>{isPF ? 'CPF (*)' : `${t.cnpj} (*)`}</label>
                         <input 
                           type="text" 
-                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none" 
-                          defaultValue={selectedClient?.document}
-                          onChange={(e) => { e.target.value = isPF ? maskCPF(e.target.value) : maskCNPJ(e.target.value) }}
+                          className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl outline-none transition-all ${docError ? 'border-red-500 focus:ring-red-200' : 'border-gray-100 focus:ring-secondary/20'}`} 
+                          value={formData.document}
+                          onChange={handleDocumentChange}
                         />
+                        {docError && <p className="text-[10px] font-bold text-red-500 mt-1 uppercase tracking-tighter">Documento inválido</p>}
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{isPF ? 'Naturalidade' : 'Profissão do Representante'}</label>
-                        <input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none" />
+                        <input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none" value={formData.naturalidade} onChange={(e) => setFormData({...formData, naturalidade: e.target.value})} />
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{t.email} (*)</label>
-                        <input type="email" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none" defaultValue={selectedClient?.email} />
+                        <input type="email" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
                       </div>
                     </div>
                     <div className="space-y-4">
                       <div>
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{isPF ? 'Estado Civil' : 'Consultor Responsável'}</label>
-                        <select className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none text-sm">
-                          {isPF ? (<><option>Solteiro(a)</option><option>Casado(a)</option></>) : (<><option>João Silva</option><option>Maria Santos</option></>)}
+                        <select className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none text-sm" value={formData.estadoCivil} onChange={(e) => setFormData({...formData, estadoCivil: e.target.value})}>
+                          {isPF ? (<><option value="">Selecione...</option><option>Solteiro(a)</option><option>Casado(a)</option><option>Divorciado(a)</option><option>Viúvo(a)</option></>) : (<><option>João Silva</option><option>Maria Santos</option></>)}
                         </select>
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{t.phone} (*)</label>
-                        <input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none" defaultValue={selectedClient?.phone} />
+                        <input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} />
                       </div>
                     </div>
                   </div>
@@ -244,18 +352,66 @@ const Clients: React.FC<ClientsProps> = ({ role, language }) => {
                 {activeTabIndex === 1 && (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-left-2 duration-300">
                     <div className="space-y-4">
-                      <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{t.zipCode}</label><input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none" onChange={(e) => e.target.value = maskCEP(e.target.value)} /></div>
-                      <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{t.street}</label><input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none" /></div>
+                      <div>
+                        <label className={`block text-[10px] font-bold uppercase mb-1 ${cepError ? 'text-red-500' : 'text-gray-400'}`}>
+                          {t.zipCode} {isSearchingCep && <span className="animate-pulse ml-1 text-primary lowercase">(buscando...)</span>}
+                        </label>
+                        <input 
+                          type="text" 
+                          className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl outline-none transition-all ${cepError ? 'border-red-500 focus:ring-red-200' : 'border-gray-100 focus:ring-secondary/20'}`} 
+                          value={formData.cep}
+                          onChange={handleCEPChange}
+                          placeholder="00000-000"
+                        />
+                        {cepError && <p className="text-[10px] font-bold text-red-500 mt-1 uppercase tracking-tighter">CEP inválido</p>}
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{t.street}</label>
+                        <input 
+                          type="text" 
+                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none" 
+                          value={formData.logradouro}
+                          onChange={(e) => setFormData({...formData, logradouro: e.target.value})}
+                        />
+                      </div>
                     </div>
                     <div className="space-y-4">
-                      <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Número</label><input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none" /></div>
-                      <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{t.neighborhood}</label><input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none" /></div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Número</label>
+                        <input 
+                          type="text" 
+                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none" 
+                          value={formData.numero}
+                          onChange={(e) => setFormData({...formData, numero: e.target.value})}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{t.neighborhood}</label>
+                        <input 
+                          type="text" 
+                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none" 
+                          value={formData.bairro}
+                          onChange={(e) => setFormData({...formData, bairro: e.target.value})}
+                        />
+                      </div>
                     </div>
                     <div className="space-y-4">
-                      <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{t.city}</label><input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none" /></div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{t.city}</label>
+                        <input 
+                          type="text" 
+                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none" 
+                          value={formData.cidade}
+                          onChange={(e) => setFormData({...formData, cidade: e.target.value})}
+                        />
+                      </div>
                       <div>
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{t.state}</label>
-                        <select className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none text-sm">
+                        <select 
+                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none text-sm"
+                          value={formData.estado}
+                          onChange={(e) => setFormData({...formData, estado: e.target.value})}
+                        >
                           <option value="">Selecione...</option>
                           {BRAZILIAN_STATES.map(state => (
                             <option key={state.value} value={state.value}>{state.value} - {state.label}</option>
@@ -483,7 +639,7 @@ const Clients: React.FC<ClientsProps> = ({ role, language }) => {
 
             <div className="p-6 md:p-8 bg-gray-50 flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 rounded-b-3xl border-t border-gray-100">
               <button onClick={() => setShowModal(false)} className="px-8 py-2.5 font-bold text-bodyText hover:text-secondary transition-colors uppercase text-xs tracking-widest">{t.cancel}</button>
-              <button className="px-14 py-2.5 bg-buttons text-white rounded-2xl font-bold shadow-xl hover:opacity-95 transition-all transform hover:-translate-y-1 active:scale-95 uppercase text-xs tracking-widest">
+              <button disabled={docError || cepError} className={`px-14 py-2.5 bg-buttons text-white rounded-2xl font-bold shadow-xl hover:opacity-95 transition-all transform hover:-translate-y-1 active:scale-95 uppercase text-xs tracking-widest ${docError || cepError ? 'opacity-50 cursor-not-allowed grayscale' : ''}`}>
                 {selectedClient ? t.save : t.register}
               </button>
             </div>

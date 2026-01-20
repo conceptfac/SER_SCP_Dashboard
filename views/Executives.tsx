@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Executive, Language, UserRole } from '../types';
 import { TRANSLATIONS, BANKS, BRAZILIAN_STATES } from '../constants';
@@ -36,6 +35,11 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
   const [showModal, setShowModal] = useState(false);
   const [showAddBankModal, setShowAddBankModal] = useState(false);
   const [selectedExec, setSelectedExec] = useState<Executive | null>(null);
+  const [cepError, setCepError] = useState(false);
+  const [docError, setDocError] = useState(false);
+  const [cnpjError, setCnpjError] = useState(false);
+  const [isSearchingCep, setIsSearchingCep] = useState(false);
+  
   const TABS = [t.general, t.address, t.bankData, t.documents];
   const [activeTabIndex, setActiveTabIndex] = useState(0);
   
@@ -49,7 +53,54 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
     { id: '1', type: 'RG', category: 'Identidade', name: 'identidade_joao.pdf', date: '10/06/2024 09:00', status: 'Ativo' }
   ]);
 
-  const [formData, setFormData] = useState({ name: '', document: '', email: '', birthDate: '', rg: '', phone: '' });
+  const [formData, setFormData] = useState({ 
+    name: '', document: '', email: '', birthDate: '', rg: '', phone: '',
+    cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', estado: '',
+    razaoSocial: '', cnpj: ''
+  });
+
+  const validateCPF = (cpf: string) => {
+    cpf = cpf.replace(/\D/g, '');
+    if (cpf.length !== 11 || !!cpf.match(/(\d)\1{10}/)) return false;
+    let sum = 0, rest;
+    for (let i = 1; i <= 9; i++) sum = sum + parseInt(cpf.substring(i - 1, i)) * (11 - i);
+    rest = (sum * 10) % 11;
+    if (rest === 10 || rest === 11) rest = 0;
+    if (rest !== parseInt(cpf.substring(9, 10))) return false;
+    sum = 0;
+    for (let i = 1; i <= 10; i++) sum = sum + parseInt(cpf.substring(i - 1, i)) * (12 - i);
+    rest = (sum * 10) % 11;
+    if (rest === 10 || rest === 11) rest = 0;
+    if (rest !== parseInt(cpf.substring(10, 11))) return false;
+    return true;
+  };
+
+  const validateCNPJ = (cnpj: string) => {
+    cnpj = cnpj.replace(/\D/g, '');
+    if (cnpj.length !== 14 || !!cnpj.match(/(\d)\1{13}/)) return false;
+    let size = cnpj.length - 2;
+    let numbers = cnpj.substring(0, size);
+    const digits = cnpj.substring(size);
+    let sum = 0;
+    let pos = size - 7;
+    for (let i = size; i >= 1; i--) {
+      sum += parseInt(numbers.charAt(size - i)) * pos--;
+      if (pos < 2) pos = 9;
+    }
+    let result = sum % 11 < 2 ? 0 : 11 - (sum % 11);
+    if (result !== parseInt(digits.charAt(0))) return false;
+    size = size + 1;
+    numbers = cnpj.substring(0, size);
+    sum = 0;
+    pos = size - 7;
+    for (let i = size; i >= 1; i--) {
+      sum += parseInt(numbers.charAt(size - i)) * pos--;
+      if (pos < 2) pos = 9;
+    }
+    result = sum % 11 < 2 ? 0 : 11 - (sum % 11);
+    if (result !== parseInt(digits.charAt(1))) return false;
+    return true;
+  };
 
   const executives: Executive[] = [
     { id: '1', name: 'João Silva', document: '111.222.333-44', email: 'joao@ser.com', role: 'Executivo Leader' },
@@ -58,6 +109,39 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
   const maskCPF = (v: string) => v.replace(/\D/g, '').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2').substring(0, 14);
   const maskCNPJ = (v: string) => v.replace(/\D/g, '').replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d)/, '$1-$2').substring(0, 18);
   const maskCEP = (v: string) => v.replace(/\D/g, '').replace(/(\d{5})(\d)/, '$1-$2').substring(0, 9);
+
+  const handleCEPChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawValue = e.target.value.replace(/\D/g, '');
+    const maskedValue = maskCEP(e.target.value);
+    
+    setFormData(prev => ({ ...prev, cep: maskedValue }));
+    setCepError(false);
+
+    if (rawValue.length === 8) {
+      setIsSearchingCep(true);
+      try {
+        const response = await fetch(`https://viacep.com.br/ws/${rawValue}/json/`);
+        const data = await response.json();
+        
+        if (data.erro) {
+          setCepError(true);
+        } else {
+          setFormData(prev => ({
+            ...prev,
+            logradouro: data.logradouro || '',
+            bairro: data.bairro || '',
+            cidade: data.localidade || '',
+            estado: data.uf || ''
+          }));
+        }
+      } catch (error) {
+        console.error("Erro ao buscar CEP:", error);
+        setCepError(true);
+      } finally {
+        setIsSearchingCep(false);
+      }
+    }
+  };
 
   const handleToggleBank = (id: string) => {
     setBankAccounts(bankAccounts.map(acc => ({
@@ -69,10 +153,25 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
   const handleOpenModal = (exec: Executive | null = null) => {
     setSelectedExec(exec);
     setActiveTabIndex(0);
-    setShowModal(true);
+    setCepError(false);
+    setDocError(false);
+    setCnpjError(false);
     if (exec) {
-      setFormData({ ...formData, name: exec.name, document: exec.document, email: exec.email });
+      setFormData({
+        ...formData, 
+        name: exec.name, 
+        document: exec.document, 
+        email: exec.email,
+        cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', estado: ''
+      });
+    } else {
+      setFormData({
+        name: '', document: '', email: '', birthDate: '', rg: '', phone: '',
+        cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', estado: '',
+        razaoSocial: '', cnpj: ''
+      });
     }
+    setShowModal(true);
   };
 
   return (
@@ -130,9 +229,9 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4">
           <div className="absolute inset-0 bg-secondary/40 backdrop-blur-sm" onClick={() => setShowModal(false)}></div>
-          <div className="relative bg-white w-full max-w-5xl max-h-[95vh] overflow-y-auto rounded-3xl shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col font-sans">
+          <div className="relative bg-white w-full sm:max-w-5xl h-full sm:h-auto sm:max-h-[95vh] overflow-y-auto sm:rounded-3xl shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col font-sans">
             <div className="p-8 flex-1">
               <div className="flex items-center justify-between mb-8">
                 <div>
@@ -156,16 +255,49 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
                 {activeTabIndex === 0 && (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-left-2 duration-300">
                     <div className="space-y-4">
-                      <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nome Completo (*)</label><input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner" defaultValue={formData.name} /></div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nome Completo (*)</label>
+                        <input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
+                      </div>
                       <DatePicker label="Nascimento (*)" value={formData.birthDate} onChange={(d) => setFormData({...formData, birthDate: d})} language={language} />
                     </div>
                     <div className="space-y-4">
-                      <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">CPF (*)</label><input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner" defaultValue={formData.document} onChange={(e) => e.target.value = maskCPF(e.target.value)} /></div>
-                      <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Estado Civil</label><select className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner text-sm font-bold"><option>Solteiro(a)</option><option>Casado(a)</option></select></div>
+                      <div>
+                        <label className={`block text-[10px] font-bold uppercase mb-1 ${docError ? 'text-red-500' : 'text-gray-400'}`}>CPF (*)</label>
+                        <input 
+                          type="text" 
+                          className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl outline-none shadow-inner transition-all ${docError ? 'border-red-500 focus:ring-red-200' : 'border-gray-100 focus:ring-secondary/20'}`} 
+                          value={formData.document} 
+                          onChange={(e) => {
+                            const raw = e.target.value.replace(/\D/g, '');
+                            const val = maskCPF(e.target.value);
+                            setFormData({...formData, document: val});
+                            if (raw.length === 11) setDocError(!validateCPF(raw));
+                            else setDocError(false);
+                          }} 
+                        />
+                        {docError && <p className="text-[10px] font-bold text-red-500 mt-1 uppercase tracking-tighter">Documento inválido</p>}
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Estado Civil</label>
+                        <select className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner text-sm font-bold" value={formData.estadoCivil} onChange={(e) => setFormData({...formData, estadoCivil: e.target.value})}>
+                          <option value="">Selecione...</option>
+                          <option>Solteiro(a)</option>
+                          <option>Casado(a)</option>
+                          <option>Divorciado(a)</option>
+                          <option>Viúvo(a)</option>
+                        </select>
+                      </div>
                     </div>
                     <div className="space-y-4">
-                      <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">RG</label><input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner" /></div>
-                      <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">E-mail (*)</label><input type="email" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner" defaultValue={formData.email} /></div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">RG</label>
+                        <input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner" value={formData.rg} onChange={(e) => setFormData({...formData, rg: e.target.value})} />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">E-mail (*)</label>
+                        <input type="email" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
+                      </div>
                     </div>
                   </div>
                 )}
@@ -173,18 +305,73 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
                 {activeTabIndex === 1 && (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-left-2 duration-300">
                     <div className="space-y-4">
-                      <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">CEP</label><input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner" onChange={(e) => e.target.value = maskCEP(e.target.value)} /></div>
-                      <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Logradouro (*)</label><input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner" /></div>
+                      <div>
+                        <label className={`block text-[10px] font-bold uppercase mb-1 ${cepError ? 'text-red-500' : 'text-gray-400'}`}>
+                          CEP {isSearchingCep && <span className="animate-pulse ml-1 text-primary lowercase">(buscando...)</span>}
+                        </label>
+                        <input 
+                          type="text" 
+                          className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl outline-none shadow-inner transition-all ${cepError ? 'border-red-500' : 'border-gray-100 focus:border-secondary/30'}`} 
+                          value={formData.cep}
+                          onChange={handleCEPChange}
+                          placeholder="00000-000"
+                        />
+                        {cepError && <p className="text-[10px] font-bold text-red-500 mt-1 uppercase tracking-tighter">CEP inválido</p>}
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Logradouro (*)</label>
+                        <input 
+                          type="text" 
+                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner" 
+                          value={formData.logradouro}
+                          onChange={(e) => setFormData({...formData, logradouro: e.target.value})}
+                        />
+                      </div>
                     </div>
                     <div className="space-y-4">
-                      <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Razão Social (*)</label><input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner" /></div>
-                      <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">CNPJ (*)</label><input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner" onChange={(e) => e.target.value = maskCNPJ(e.target.value)} /></div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Razão Social (*)</label>
+                        <input 
+                          type="text" 
+                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner" 
+                          value={formData.razaoSocial}
+                          onChange={(e) => setFormData({...formData, razaoSocial: e.target.value})}
+                        />
+                      </div>
+                      <div>
+                        <label className={`block text-[10px] font-bold uppercase mb-1 ${cnpjError ? 'text-red-500' : 'text-gray-400'}`}>CNPJ (*)</label>
+                        <input 
+                          type="text" 
+                          className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl outline-none shadow-inner transition-all ${cnpjError ? 'border-red-500 focus:ring-red-200' : 'border-gray-100 focus:ring-secondary/20'}`} 
+                          value={formData.cnpj}
+                          onChange={(e) => {
+                            const raw = e.target.value.replace(/\D/g, '');
+                            const val = maskCNPJ(e.target.value);
+                            setFormData({...formData, cnpj: val});
+                            if (raw.length === 14) setCnpjError(!validateCNPJ(raw));
+                            else setCnpjError(false);
+                          }}
+                        />
+                        {cnpjError && <p className="text-[10px] font-bold text-red-500 mt-1 uppercase tracking-tighter">Documento inválido</p>}
+                      </div>
                     </div>
                     <div className="space-y-4">
-                      <div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cidade (*)</label><input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner" /></div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cidade (*)</label>
+                        <input 
+                          type="text" 
+                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner" 
+                          value={formData.cidade}
+                          onChange={(e) => setFormData({...formData, cidade: e.target.value})}
+                        />
+                      </div>
                       <div>
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Estado (*)</label>
-                        <select className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner text-sm font-bold">
+                        <select 
+                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner text-sm font-bold"
+                          value={formData.estado}
+                          onChange={(e) => setFormData({...formData, estado: e.target.value})}
+                        >
                           <option value="">Selecione...</option>
                           {BRAZILIAN_STATES.map(state => (
                             <option key={state.value} value={state.value}>{state.value} - {state.label}</option>
@@ -300,7 +487,7 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
 
               <div className="mt-10 pt-6 border-t border-gray-100 flex justify-end gap-4">
                 <button onClick={() => setShowModal(false)} className="px-8 py-2.5 text-xs font-black text-bodyText hover:text-secondary uppercase tracking-widest transition-colors">{t.cancel}</button>
-                <button className="px-14 py-2.5 bg-buttons text-white rounded-[1.5rem] font-black shadow-2xl hover:opacity-95 transform transition-all hover:-translate-y-1 text-xs uppercase tracking-widest">{selectedExec ? t.save : t.register}</button>
+                <button disabled={docError || cnpjError || cepError} className={`px-14 py-2.5 bg-buttons text-white rounded-[1.5rem] font-black shadow-2xl hover:opacity-95 transform transition-all hover:-translate-y-1 text-xs uppercase tracking-widest ${docError || cnpjError || cepError ? 'opacity-50 cursor-not-allowed grayscale' : ''}`}>{selectedExec ? t.save : t.register}</button>
               </div>
             </div>
           </div>
