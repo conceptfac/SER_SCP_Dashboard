@@ -210,13 +210,13 @@ const Clients: React.FC<ClientsProps> = ({ role, language }) => {
       <div className={`bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100 grid grid-cols-1 sm:grid-cols-2 ${role === UserRole.HEAD ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-4`}>
         <div>
           <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">{t.name}</label>
-          <input type="text" className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none text-sm" placeholder={t.placeholderSearch} />
+          <input type="text" className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none text-sm text-secondary" placeholder={t.placeholderSearch} />
         </div>
         <div>
           <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">{t.document}</label>
           <input 
             type="text" 
-            className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none text-sm" 
+            className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none text-sm text-secondary" 
             placeholder="000.000.000-00" 
             onChange={(e) => { e.target.value = isPF ? maskCPF(e.target.value) : maskCNPJ(e.target.value) }}
           />
@@ -224,7 +224,7 @@ const Clients: React.FC<ClientsProps> = ({ role, language }) => {
         {role === UserRole.HEAD && (
           <div>
             <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">{t.consultant}</label>
-            <input type="text" className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none text-sm" placeholder={t.searchExec} />
+            <input type="text" className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none text-sm text-secondary" placeholder={t.searchExec} />
           </div>
         )}
         <div className="flex items-end">
@@ -247,7 +247,7 @@ const Clients: React.FC<ClientsProps> = ({ role, language }) => {
               {clients.map(client => (
                 <tr key={client.id} className="hover:bg-gray-50/50 transition-colors">
                   <td className="px-6 py-4 text-secondary font-normal">{client.name}</td>
-                  <td className="px-6 py-4 text-sm font-normal">{client.document}</td>
+                  <td className="px-6 py-4 text-sm font-normal text-secondary">{client.document}</td>
                   <td className="px-6 py-4">
                      <span className={`px-3 py-1 rounded-full text-[10px] font-extrabold border uppercase tracking-wider ${getStatusColor(client.status)}`}>{client.status}</span>
                   </td>
@@ -301,11 +301,11 @@ const Clients: React.FC<ClientsProps> = ({ role, language }) => {
                     <div className="space-y-4">
                       <div>
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{isPF ? `${t.fullName} (*)` : `${t.companyName} (*)`}</label>
-                        <input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-2 focus:ring-secondary/20" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
+                        <input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-2 focus:ring-secondary/20 text-secondary" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{isPF ? 'RG' : t.businessName}</label>
-                        <input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none" value={formData.rg} onChange={(e) => setFormData({...formData, rg: e.target.value})} />
+                        <input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none text-secondary" value={formData.rg} onChange={(e) => setFormData({...formData, rg: e.target.value})} />
                       </div>
                       <DatePicker 
                         label={isPF ? `${t.birthDate} (*)` : 'Data de fundação (*)'}
@@ -319,7 +319,7 @@ const Clients: React.FC<ClientsProps> = ({ role, language }) => {
                         <label className={`block text-[10px] font-bold uppercase mb-1 ${docError ? 'text-red-500' : 'text-gray-400'}`}>{isPF ? 'CPF (*)' : `${t.cnpj} (*)`}</label>
                         <input 
                           type="text" 
-                          className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl outline-none transition-all ${docError ? 'border-red-500 focus:ring-red-200' : 'border-gray-100 focus:ring-secondary/20'}`} 
+                          className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl outline-none transition-all text-secondary ${docError ? 'border-red-500 focus:ring-red-200' : 'border-gray-100 focus:ring-secondary/20'}`} 
                           value={formData.document}
                           onChange={handleDocumentChange}
                         />
@@ -327,23 +327,23 @@ const Clients: React.FC<ClientsProps> = ({ role, language }) => {
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{isPF ? 'Naturalidade' : 'Profissão do Representante'}</label>
-                        <input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none" value={formData.naturalidade} onChange={(e) => setFormData({...formData, naturalidade: e.target.value})} />
+                        <input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none text-secondary" value={formData.naturalidade} onChange={(e) => setFormData({...formData, naturalidade: e.target.value})} />
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{t.email} (*)</label>
-                        <input type="email" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
+                        <input type="email" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none text-secondary" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
                       </div>
                     </div>
                     <div className="space-y-4">
                       <div>
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{isPF ? 'Estado Civil' : 'Consultor Responsável'}</label>
-                        <select className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none text-sm" value={formData.estadoCivil} onChange={(e) => setFormData({...formData, estadoCivil: e.target.value})}>
+                        <select className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none text-sm text-secondary" value={formData.estadoCivil} onChange={(e) => setFormData({...formData, estadoCivil: e.target.value})}>
                           {isPF ? (<><option value="">Selecione...</option><option>Solteiro(a)</option><option>Casado(a)</option><option>Divorciado(a)</option><option>Viúvo(a)</option></>) : (<><option>João Silva</option><option>Maria Santos</option></>)}
                         </select>
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{t.phone} (*)</label>
-                        <input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} />
+                        <input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none text-secondary" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} />
                       </div>
                     </div>
                   </div>
@@ -358,7 +358,7 @@ const Clients: React.FC<ClientsProps> = ({ role, language }) => {
                         </label>
                         <input 
                           type="text" 
-                          className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl outline-none transition-all ${cepError ? 'border-red-500 focus:ring-red-200' : 'border-gray-100 focus:ring-secondary/20'}`} 
+                          className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl outline-none transition-all text-secondary ${cepError ? 'border-red-500 focus:ring-red-200' : 'border-gray-100 focus:ring-secondary/20'}`} 
                           value={formData.cep}
                           onChange={handleCEPChange}
                           placeholder="00000-000"
@@ -369,7 +369,7 @@ const Clients: React.FC<ClientsProps> = ({ role, language }) => {
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{t.street}</label>
                         <input 
                           type="text" 
-                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none" 
+                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none text-secondary" 
                           value={formData.logradouro}
                           onChange={(e) => setFormData({...formData, logradouro: e.target.value})}
                         />
@@ -380,7 +380,7 @@ const Clients: React.FC<ClientsProps> = ({ role, language }) => {
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Número</label>
                         <input 
                           type="text" 
-                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none" 
+                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none text-secondary" 
                           value={formData.numero}
                           onChange={(e) => setFormData({...formData, numero: e.target.value})}
                         />
@@ -389,7 +389,7 @@ const Clients: React.FC<ClientsProps> = ({ role, language }) => {
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{t.neighborhood}</label>
                         <input 
                           type="text" 
-                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none" 
+                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none text-secondary" 
                           value={formData.bairro}
                           onChange={(e) => setFormData({...formData, bairro: e.target.value})}
                         />
@@ -400,7 +400,7 @@ const Clients: React.FC<ClientsProps> = ({ role, language }) => {
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{t.city}</label>
                         <input 
                           type="text" 
-                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none" 
+                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none text-secondary" 
                           value={formData.cidade}
                           onChange={(e) => setFormData({...formData, cidade: e.target.value})}
                         />
@@ -408,7 +408,7 @@ const Clients: React.FC<ClientsProps> = ({ role, language }) => {
                       <div>
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{t.state}</label>
                         <select 
-                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none text-sm"
+                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none text-sm text-secondary"
                           value={formData.estado}
                           onChange={(e) => setFormData({...formData, estado: e.target.value})}
                         >
@@ -468,7 +468,7 @@ const Clients: React.FC<ClientsProps> = ({ role, language }) => {
                       <p className="text-[11px] text-bodyText mb-6 max-w-md">Para prosseguir, anexe pelo menos um documento de identidade e um comprovante de residência atualizado.</p>
                       
                       <div className="w-full max-w-lg flex flex-col sm:flex-row gap-4 items-center">
-                        <select className="w-full flex-1 px-5 py-3 bg-white border border-gray-100 rounded-2xl outline-none text-xs font-black uppercase tracking-widest shadow-sm appearance-none cursor-pointer">
+                        <select className="w-full flex-1 px-5 py-3 bg-white border border-gray-100 rounded-2xl outline-none text-xs font-black uppercase tracking-widest shadow-sm appearance-none cursor-pointer text-secondary">
                           <optgroup label="Documento de Identidade * Obrigatório - pelo menos uma das opções">
                             <option value="RG">RG</option>
                             <option value="CPF">CPF</option>
@@ -668,13 +668,13 @@ const Clients: React.FC<ClientsProps> = ({ role, language }) => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 tracking-widest">Agência (*)</label>
-                    <input type="text" className="w-full px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner" placeholder="0000" />
+                    <input type="text" className="w-full px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner text-secondary" placeholder="0000" />
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 tracking-widest">Conta e Dígito (*)</label>
                     <div className="flex gap-2">
-                      <input type="text" className="flex-1 px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner" placeholder="000000" />
-                      <input type="text" maxLength={3} className="w-20 px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner text-center" placeholder="D" />
+                      <input type="text" className="flex-1 px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner text-secondary" placeholder="000000" />
+                      <input type="text" maxLength={3} className="w-20 px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner text-center text-secondary" placeholder="D" />
                     </div>
                   </div>
                 </div>
@@ -682,23 +682,23 @@ const Clients: React.FC<ClientsProps> = ({ role, language }) => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 tracking-widest">Tipo de Conta (*)</label>
-                    <select className="w-full px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner">
+                    <select className="w-full px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner text-secondary">
                       <option>Corrente</option><option>Poupança</option><option>Conjunta</option>
                     </select>
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 tracking-widest">Titular da Conta (*)</label>
-                    <input type="text" className="w-full px-5 py-3 bg-gray-200 border border-gray-100 rounded-2xl outline-none text-sm font-bold cursor-not-allowed opacity-60" disabled value={selectedClient?.name || ''} />
+                    <input type="text" className="w-full px-5 py-3 bg-gray-200 border border-gray-100 rounded-2xl outline-none text-sm font-bold cursor-not-allowed opacity-60 text-secondary" disabled value={selectedClient?.name || ''} />
                   </div>
                 </div>
 
                 <div className="pt-6 border-t border-gray-50">
                    <h5 className="text-[10px] font-bold text-secondary uppercase mb-4 tracking-widest flex items-center gap-2"><span className="w-2 h-2 bg-primary rounded-full"></span> Conectar Chave Pix (Opcional)</h5>
                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                     <select className="px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner">
+                     <select className="px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner text-secondary">
                        <option>CPF / CNPJ</option><option>E-mail</option><option>Celular</option><option>Chave Aleatória</option>
                      </select>
-                     <input type="text" className="px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner" placeholder="Insira a chave pix" />
+                     <input type="text" className="px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner text-secondary" placeholder="Insira a chave pix" />
                    </div>
                 </div>
               </div>

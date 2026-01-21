@@ -56,7 +56,7 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
   const [formData, setFormData] = useState({ 
     name: '', document: '', email: '', birthDate: '', rg: '', phone: '',
     cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', estado: '',
-    razaoSocial: '', cnpj: ''
+    razaoSocial: '', cnpj: '', estadoCivil: ''
   });
 
   const validateCPF = (cpf: string) => {
@@ -162,13 +162,14 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
         name: exec.name, 
         document: exec.document, 
         email: exec.email,
-        cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', estado: ''
+        cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', estado: '',
+        estadoCivil: ''
       });
     } else {
       setFormData({
         name: '', document: '', email: '', birthDate: '', rg: '', phone: '',
         cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', estado: '',
-        razaoSocial: '', cnpj: ''
+        razaoSocial: '', cnpj: '', estadoCivil: ''
       });
     }
     setShowModal(true);
@@ -187,13 +188,13 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
       <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div>
           <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">{t.name}</label>
-          <input type="text" className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none text-sm" placeholder={t.placeholderSearch} />
+          <input type="text" className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none text-sm text-secondary" placeholder={t.placeholderSearch} />
         </div>
         <div>
           <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">{t.document}</label>
           <input 
             type="text" 
-            className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none text-sm" 
+            className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none text-sm text-secondary" 
             placeholder="000.000.000-00" 
             onChange={(e) => { e.target.value = maskCPF(e.target.value) }}
           />
@@ -257,7 +258,7 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
                     <div className="space-y-4">
                       <div>
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nome Completo (*)</label>
-                        <input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
+                        <input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner text-secondary" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
                       </div>
                       <DatePicker label="Nascimento (*)" value={formData.birthDate} onChange={(d) => setFormData({...formData, birthDate: d})} language={language} />
                     </div>
@@ -266,7 +267,7 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
                         <label className={`block text-[10px] font-bold uppercase mb-1 ${docError ? 'text-red-500' : 'text-gray-400'}`}>CPF (*)</label>
                         <input 
                           type="text" 
-                          className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl outline-none shadow-inner transition-all ${docError ? 'border-red-500 focus:ring-red-200' : 'border-gray-100 focus:ring-secondary/20'}`} 
+                          className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl outline-none shadow-inner transition-all text-secondary ${docError ? 'border-red-500 focus:ring-red-200' : 'border-gray-100 focus:ring-secondary/20'}`} 
                           value={formData.document} 
                           onChange={(e) => {
                             const raw = e.target.value.replace(/\D/g, '');
@@ -280,7 +281,7 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Estado Civil</label>
-                        <select className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner text-sm font-bold" value={formData.estadoCivil} onChange={(e) => setFormData({...formData, estadoCivil: e.target.value})}>
+                        <select className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner text-sm font-bold text-secondary" value={formData.estadoCivil} onChange={(e) => setFormData({...formData, estadoCivil: e.target.value})}>
                           <option value="">Selecione...</option>
                           <option>Solteiro(a)</option>
                           <option>Casado(a)</option>
@@ -292,11 +293,11 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
                     <div className="space-y-4">
                       <div>
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">RG</label>
-                        <input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner" value={formData.rg} onChange={(e) => setFormData({...formData, rg: e.target.value})} />
+                        <input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner text-secondary" value={formData.rg} onChange={(e) => setFormData({...formData, rg: e.target.value})} />
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">E-mail (*)</label>
-                        <input type="email" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
+                        <input type="email" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner text-secondary" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
                       </div>
                     </div>
                   </div>
@@ -311,7 +312,7 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
                         </label>
                         <input 
                           type="text" 
-                          className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl outline-none shadow-inner transition-all ${cepError ? 'border-red-500' : 'border-gray-100 focus:border-secondary/30'}`} 
+                          className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl outline-none shadow-inner transition-all text-secondary ${cepError ? 'border-red-500' : 'border-gray-100 focus:border-secondary/30'}`} 
                           value={formData.cep}
                           onChange={handleCEPChange}
                           placeholder="00000-000"
@@ -322,7 +323,7 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Logradouro (*)</label>
                         <input 
                           type="text" 
-                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner" 
+                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner text-secondary" 
                           value={formData.logradouro}
                           onChange={(e) => setFormData({...formData, logradouro: e.target.value})}
                         />
@@ -333,7 +334,7 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Razão Social (*)</label>
                         <input 
                           type="text" 
-                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner" 
+                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner text-secondary" 
                           value={formData.razaoSocial}
                           onChange={(e) => setFormData({...formData, razaoSocial: e.target.value})}
                         />
@@ -342,7 +343,7 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
                         <label className={`block text-[10px] font-bold uppercase mb-1 ${cnpjError ? 'text-red-500' : 'text-gray-400'}`}>CNPJ (*)</label>
                         <input 
                           type="text" 
-                          className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl outline-none shadow-inner transition-all ${cnpjError ? 'border-red-500 focus:ring-red-200' : 'border-gray-100 focus:ring-secondary/20'}`} 
+                          className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl outline-none shadow-inner transition-all text-secondary ${cnpjError ? 'border-red-500 focus:ring-red-200' : 'border-gray-100 focus:ring-secondary/20'}`} 
                           value={formData.cnpj}
                           onChange={(e) => {
                             const raw = e.target.value.replace(/\D/g, '');
@@ -360,7 +361,7 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cidade (*)</label>
                         <input 
                           type="text" 
-                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner" 
+                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner text-secondary" 
                           value={formData.cidade}
                           onChange={(e) => setFormData({...formData, cidade: e.target.value})}
                         />
@@ -368,7 +369,7 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
                       <div>
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Estado (*)</label>
                         <select 
-                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner text-sm font-bold"
+                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner text-sm font-bold text-secondary"
                           value={formData.estado}
                           onChange={(e) => setFormData({...formData, estado: e.target.value})}
                         >
@@ -425,10 +426,10 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
                         <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
                       </div>
                       <h4 className="text-sm font-black text-secondary uppercase tracking-[0.1em] mb-2">Central de Arquivos do Executivo</h4>
-                      <p className="text-[11px] text-bodyText mb-8 max-w-lg">Anexe os documentos necessários para validação do perfil executivo.</p>
+                      <p className="text-[11px] text-bodyText mb-8 max-lg">Anexe os documentos necessários para validação do perfil executivo.</p>
                       
                       <div className="w-full max-xl flex flex-col sm:flex-row gap-4 items-center">
-                        <select className="w-full flex-1 px-5 py-3.5 bg-white border border-gray-100 rounded-2xl outline-none text-[11px] font-black uppercase tracking-widest shadow-sm appearance-none cursor-pointer">
+                        <select className="w-full flex-1 px-5 py-3.5 bg-white border border-gray-100 rounded-2xl outline-none text-[11px] font-black uppercase tracking-widest shadow-sm appearance-none cursor-pointer text-secondary">
                           <optgroup label="Documento de Identidade * Obrigatório">
                             <option value="RG">RG</option>
                             <option value="CPF">CPF</option>
@@ -465,7 +466,7 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
                                     <span className="text-[10px] font-black text-primary uppercase">{doc.category}</span>
                                   </td>
                                   <td className="px-6 py-4 text-xs font-black text-secondary">{doc.type}</td>
-                                  <td className="px-6 py-4 text-[11px] text-bodyText font-bold">{doc.name}</td>
+                                  <td className="px-6 py-4 text-[11px] text-bodyText font-bold text-secondary">{doc.name}</td>
                                   <td className="px-6 py-4">
                                     <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase border ${doc.status === 'Ativo' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-orange-100 text-orange-700 border-orange-200'}`}>
                                       {doc.status}
@@ -515,13 +516,13 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 tracking-widest">Agência (*)</label>
-                    <input type="text" className="w-full px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner" placeholder="0000" />
+                    <input type="text" className="w-full px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner text-secondary" placeholder="0000" />
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 tracking-widest">Conta e Dígito (*)</label>
                     <div className="flex gap-2">
-                      <input type="text" className="flex-1 px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner" placeholder="000000" />
-                      <input type="text" maxLength={3} className="w-20 px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner text-center" placeholder="D" />
+                      <input type="text" className="flex-1 px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner text-secondary" placeholder="000000" />
+                      <input type="text" maxLength={3} className="w-20 px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner text-center text-secondary" placeholder="D" />
                     </div>
                   </div>
                 </div>
@@ -529,23 +530,23 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 tracking-widest">Tipo de Conta (*)</label>
-                    <select className="w-full px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner">
+                    <select className="w-full px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner text-secondary">
                       <option>Corrente</option><option>Poupança</option><option>Conjunta</option>
                     </select>
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 tracking-widest">Titular da Conta (*)</label>
-                    <input type="text" className="w-full px-5 py-3 bg-gray-200 border border-gray-100 rounded-2xl outline-none text-sm font-bold cursor-not-allowed opacity-60" disabled value={selectedExec?.name || ''} />
+                    <input type="text" className="w-full px-5 py-3 bg-gray-200 border border-gray-100 rounded-2xl outline-none text-sm font-bold cursor-not-allowed opacity-60 text-secondary" disabled value={selectedExec?.name || ''} />
                   </div>
                 </div>
 
                 <div className="pt-6 border-t border-gray-50">
                    <h5 className="text-[10px] font-bold text-secondary uppercase mb-4 tracking-widest flex items-center gap-2"><span className="w-2 h-2 bg-primary rounded-full"></span> Conectar Chave Pix (Opcional)</h5>
                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                     <select className="px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner">
+                     <select className="px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner text-secondary">
                        <option>CPF / CNPJ</option><option>E-mail</option><option>Celular</option><option>Chave Aleatória</option>
                      </select>
-                     <input type="text" className="px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner" placeholder="Insira a chave pix" />
+                     <input type="text" className="px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner text-secondary" placeholder="Insira a chave pix" />
                    </div>
                 </div>
               </div>
