@@ -12,15 +12,17 @@ export interface BankAccountCardData {
   pixType?: string;
   isActive: boolean;
   isValid: boolean;
+  holderName?: string;
 }
 
 interface BankAccountCardProps {
   account: BankAccountCardData;
   onToggle: (id: string) => void;
   onDelete: (account: BankAccountCardData) => void;
+  onEdit?: (account: BankAccountCardData) => void;
 }
 
-const BankAccountCard: React.FC<BankAccountCardProps> = ({ account, onToggle, onDelete }) => {
+const BankAccountCard: React.FC<BankAccountCardProps> = ({ account, onToggle, onDelete, onEdit }) => {
   return (
     <div className={`p-6 rounded-[2rem] border transition-all flex items-center justify-between ${account.isActive ? 'bg-secondary/5 border-secondary/30 shadow-sm' : 'bg-white border-gray-100'}`}>
       <div className="flex items-center gap-5">
@@ -45,6 +47,11 @@ const BankAccountCard: React.FC<BankAccountCardProps> = ({ account, onToggle, on
             <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-all shadow-md ${account.isActive ? 'translate-x-6' : 'translate-x-0'}`}></div>
           </div>
         </div>
+        {onEdit && (
+          <button onClick={() => onEdit(account)} className="text-gray-300 hover:text-secondary transition-colors p-2">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+          </button>
+        )}
         <button onClick={() => onDelete(account)} className="text-gray-300 hover:text-red-500 transition-colors p-2"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
       </div>
     </div>

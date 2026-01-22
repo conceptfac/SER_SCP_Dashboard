@@ -1,20 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../supabaseClient';
 import { Client, Language, UserRole } from '../types';
 import { TRANSLATIONS, BANKS, BRAZILIAN_STATES } from '../constants';
 import DatePicker from '../components/DatePicker';
-
-interface BankAccount {
-  id: string;
-  bankCode: string;
-  bankName: string;
-  agency: string;
-  account: string;
-  digit: string;
-  type: string;
-  pixKey?: string;
-  pixType?: string;
-  isActive: boolean;
-}
+import BankAccountCard, { BankAccountCardData } from '../components/BankAccountCard';
+import AddBankModal, { NewBankData } from '../components/AddBankModal';
 
 interface UploadedDocument {
   id: string;
@@ -30,6 +20,19 @@ interface ClientsProps {
   language: Language;
 }
 
+const ACCOUNT_KIND_MAP: Record<number, string> = {
+  1: 'Corrente',
+  2: 'Poupança',
+  3: 'Conjunta'
+};
+
+const PIX_KEY_TYPE_MAP: Record<number, string> = {
+  1: 'CPF/CNPJ',
+  2: 'E-mail',
+  3: 'Celular',
+  4: 'Aleatória'
+};
+
 const Clients: React.FC<ClientsProps> = ({ role, language }) => {
   const t = TRANSLATIONS[language];
   const [showModal, setShowModal] = useState(false);
@@ -39,15 +42,13 @@ const Clients: React.FC<ClientsProps> = ({ role, language }) => {
   const [cepError, setCepError] = useState(false);
   const [docError, setDocError] = useState(false);
   const [isSearchingCep, setIsSearchingCep] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   
   const TABS = [t.general, t.address, t.bankData, t.documents, t.statusFlow];
   const [activeTabIndex, setActiveTabIndex] = useState(0);
 
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([
-    { id: '1', bankCode: '341', bankName: 'Itaú Unibanco S.A.', agency: '0102', account: '12345', digit: '6', type: 'Corrente', isActive: true, pixKey: 'cliente@pix.com', pixType: 'E-mail' },
-    { id: '2', bankCode: '001', bankName: 'Banco do Brasil S.A.', agency: '4321', account: '98765', digit: 'X', type: 'Corrente', isActive: false },
-    { id: '3', bankCode: '260', bankName: 'Nu Pagamentos S.A. (Nubank)', agency: '0001', account: '665544', digit: '2', type: 'Corrente', isActive: false }
-  ]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccountCardData[]>([]);
+  const [editingAccount, setEditingAccount] = useState<BankAccountCardData | null>(null);
 
   const [uploadedDocs, setUploadedDocs] = useState<UploadedDocument[]>([
     { id: '1', type: 'CNH', category: 'Identidade', name: 'cnh_frente_verso.pdf', date: '24/05/2024 10:20', status: 'Ativo' },
@@ -159,11 +160,128 @@ const Clients: React.FC<ClientsProps> = ({ role, language }) => {
     }
   };
 
-  const handleToggleBank = (id: string) => {
-    setBankAccounts(bankAccounts.map(acc => ({
+  const fetchBankAccounts = async () => {
+    if (!selectedClient) return;
+    try {
+      const { data, error } = await supabase
+        .from('bank_accounts')
+        .select('*')
+        .eq('customer_id', selectedClient.id)
+        .order('id', { ascending: true });
+
+      if (error) throw error;
+
+      const mappedAccounts: BankAccountCardData[] = (data || []).map((item: any) => ({
+        id: item.id.toString(),
+        bankCode: item.bank_id,
+        bankName: item.bank_name,
+        agency: item.agency || '',
+        account: item.account || '',
+        digit: item.digit || '',
+        type: item.account_type === 1 ? (ACCOUNT_KIND_MAP[item.account_kind] || 'Conta') : 'Pix',
+        pixKey: item.pix_key,
+        pixType: item.pix_key_type ? PIX_KEY_TYPE_MAP[item.pix_key_type] : undefined,
+        isActive: item.is_primary,
+        isValid: item.is_valid,
+        holderName: item.account_holder
+      }));
+
+      setBankAccounts(mappedAccounts);
+    } catch (error) {
+      console.error('Erro ao buscar contas bancárias:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (showModal && activeTabIndex === 2) {
+      fetchBankAccounts();
+    }
+  }, [showModal, activeTabIndex, selectedClient]);
+
+  const handleToggleBank = async (id: string) => {
+    if (!selectedClient) return;
+    const updatedAccounts = bankAccounts.map(acc => ({
       ...acc,
       isActive: acc.id === id
-    })));
+    }));
+    setBankAccounts(updatedAccounts);
+
+    try {
+      await supabase.from('bank_accounts').update({ is_primary: false }).eq('customer_id', selectedClient.id);
+      await supabase.from('bank_accounts').update({ is_primary: true }).eq('id', id);
+      fetchBankAccounts();
+    } catch (error) {
+      console.error('Erro ao atualizar conta principal:', error);
+      fetchBankAccounts();
+    }
+  };
+
+  const handleDeleteBank = async (account: BankAccountCardData) => {
+    if (!selectedClient) return;
+    if (window.confirm(`Deseja mesmo remover a instituicao ${account.bankName} do cliente ${selectedClient.name}?`)) {
+      try {
+        const { error } = await supabase.from('bank_accounts').delete().eq('id', account.id);
+        if (error) throw error;
+        fetchBankAccounts();
+      } catch (error) {
+        console.error('Erro ao excluir conta:', error);
+        alert('Erro ao excluir conta.');
+      }
+    }
+  };
+
+  const handleEditBank = (account: BankAccountCardData) => {
+    setEditingAccount(account);
+    setShowAddBankModal(true);
+  };
+
+  const handleSaveBank = async (data: NewBankData) => {
+    if (!selectedClient) return;
+    setIsLoading(true);
+    try {
+      const bankName = BANKS.find(b => b.code === data.bankCode)?.name || '';
+      const kindMap: Record<string, number> = { 'Corrente': 1, 'Poupança': 2, 'Conjunta': 3 };
+      const pixMap: Record<string, number> = { 'CPF/CNPJ': 1, 'E-mail': 2, 'Celular': 3, 'Aleatória': 4 };
+
+      const payload: any = {
+        customer_id: selectedClient.id,
+        account_type: data.accountType === 'BANK' ? 1 : 2,
+        bank_id: data.bankCode,
+        bank_name: bankName,
+        is_primary: editingAccount ? editingAccount.isActive : bankAccounts.length === 0
+      };
+
+      if (data.accountType === 'BANK') {
+        Object.assign(payload, { 
+          agency: data.agency, account: data.account, digit: data.digit, account_kind: kindMap[data.kind], account_holder: data.holderName || selectedClient.name,
+          pix_key: null, pix_key_type: null
+        });
+      } else {
+        Object.assign(payload, { 
+          pix_key_type: pixMap[data.pixType], pix_key: data.pixKey,
+          agency: null, account: null, digit: null, account_kind: null, account_holder: null
+        });
+      }
+
+      let error;
+      if (editingAccount) {
+        const { error: updateError } = await supabase.from('bank_accounts').update(payload).eq('id', editingAccount.id);
+        error = updateError;
+      } else {
+        const { error: insertError } = await supabase.from('bank_accounts').insert(payload);
+        error = insertError;
+      }
+
+      if (error) throw error;
+      await fetchBankAccounts();
+      setShowAddBankModal(false);
+      setEditingAccount(null);
+    } catch (error) {
+      console.error('Erro ao salvar banco:', error);
+      alert('Erro ao salvar dados bancários.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleOpenModal = (client: Client | null = null) => {
@@ -434,26 +552,19 @@ const Clients: React.FC<ClientsProps> = ({ role, language }) => {
 
                     <div className="grid grid-cols-1 gap-4">
                       {bankAccounts.map(acc => (
-                        <div key={acc.id} className={`p-6 rounded-[2rem] border transition-all flex items-center justify-between ${acc.isActive ? 'bg-secondary/5 border-secondary/30 shadow-sm' : 'bg-white border-gray-100'}`}>
-                          <div className="flex items-center gap-5">
-                            <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-100 font-black text-secondary text-sm shadow-sm">{acc.bankCode}</div>
-                            <div>
-                              <p className="text-sm font-black text-secondary uppercase tracking-tight">{acc.bankName}</p>
-                              <p className="text-[10px] font-bold text-gray-400 uppercase mt-1 tracking-widest">AG: {acc.agency} | CC: {acc.account}-{acc.digit} | {acc.type}</p>
-                              {acc.pixKey && <p className="text-[10px] font-black text-primary mt-2 flex items-center gap-2 uppercase"><span className="w-2 h-2 bg-primary rounded-full shadow-[0_0_8px_rgba(47,84,160,0.5)]"></span> PIX Ativo: {acc.pixKey}</p>}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-5">
-                            <div className="flex flex-col items-end mr-2">
-                              <p className="text-[10px] font-black text-gray-400 uppercase mb-1 tracking-tighter">{acc.isActive ? 'ATIVO' : 'LATENTE'}</p>
-                              <div onClick={() => handleToggleBank(acc.id)} className={`w-12 h-6 rounded-full cursor-pointer transition-all relative ${acc.isActive ? 'bg-green-500' : 'bg-gray-200 shadow-inner'}`}>
-                                <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-all shadow-md ${acc.isActive ? 'left-6.5' : 'left-0.5'}`}></div>
-                              </div>
-                            </div>
-                            <button className="text-gray-300 hover:text-red-500 transition-colors p-2"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
-                          </div>
-                        </div>
+                        <BankAccountCard
+                          key={acc.id}
+                          account={acc}
+                          onToggle={handleToggleBank}
+                          onDelete={handleDeleteBank}
+                          onEdit={handleEditBank}
+                        />
                       ))}
+                      {bankAccounts.length === 0 && (
+                        <div className="text-center py-8 text-gray-400 text-sm font-bold uppercase tracking-widest">
+                          Nenhuma conta bancária encontrada
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -648,68 +759,26 @@ const Clients: React.FC<ClientsProps> = ({ role, language }) => {
       )}
 
       {showAddBankModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setShowAddBankModal(false)}></div>
-          <div className="relative bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden">
-            <div className="p-8 md:p-10">
-              <div className="flex items-center justify-between mb-8">
-                <h4 className="text-2xl font-bold text-secondary uppercase tracking-tighter font-display">Nova Entidade Financeira</h4>
-                <button onClick={() => setShowAddBankModal(false)} className="text-gray-400 hover:text-secondary transition-colors"><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
-              </div>
-
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 tracking-widest">Instituição Bancária (*)</label>
-                  <select className="w-full px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold text-secondary shadow-inner">
-                    {BANKS.map(bank => <option key={bank.code} value={bank.code}>{bank.code} - {bank.name}</option>)}
-                  </select>
-                </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 tracking-widest">Agência (*)</label>
-                    <input type="text" className="w-full px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner text-secondary" placeholder="0000" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 tracking-widest">Conta e Dígito (*)</label>
-                    <div className="flex gap-2">
-                      <input type="text" className="flex-1 px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner text-secondary" placeholder="000000" />
-                      <input type="text" maxLength={3} className="w-20 px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner text-center text-secondary" placeholder="D" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 tracking-widest">Tipo de Conta (*)</label>
-                    <select className="w-full px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner text-secondary">
-                      <option>Corrente</option><option>Poupança</option><option>Conjunta</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 tracking-widest">Titular da Conta (*)</label>
-                    <input type="text" className="w-full px-5 py-3 bg-gray-200 border border-gray-100 rounded-2xl outline-none text-sm font-bold cursor-not-allowed opacity-60 text-secondary" disabled value={selectedClient?.name || ''} />
-                  </div>
-                </div>
-
-                <div className="pt-6 border-t border-gray-50">
-                   <h5 className="text-[10px] font-bold text-secondary uppercase mb-4 tracking-widest flex items-center gap-2"><span className="w-2 h-2 bg-primary rounded-full"></span> Conectar Chave Pix (Opcional)</h5>
-                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                     <select className="px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner text-secondary">
-                       <option>CPF / CNPJ</option><option>E-mail</option><option>Celular</option><option>Chave Aleatória</option>
-                     </select>
-                     <input type="text" className="px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner text-secondary" placeholder="Insira a chave pix" />
-                   </div>
-                </div>
-              </div>
-
-              <div className="mt-10 flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
-                <button onClick={() => setShowAddBankModal(false)} className="px-8 py-3 text-xs font-black text-bodyText hover:text-secondary uppercase tracking-widest transition-colors">DESCARTAR</button>
-                <button onClick={() => setShowAddBankModal(false)} className="px-12 py-3 bg-secondary text-white rounded-2xl text-xs font-black shadow-2xl hover:opacity-95 uppercase tracking-widest transition-all">CONCLUIR ADIÇÃO</button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <AddBankModal
+          isOpen={showAddBankModal}
+          onClose={() => { setShowAddBankModal(false); setEditingAccount(null); }}
+          onSave={handleSaveBank}
+          holderName={selectedClient?.name || ''}
+          isLoading={isLoading}
+          language={language}
+          existingAccounts={bankAccounts}
+          initialData={editingAccount ? {
+            bankCode: editingAccount.bankCode,
+            agency: editingAccount.agency,
+            account: editingAccount.account,
+            digit: editingAccount.digit,
+            kind: editingAccount.type !== 'Pix' ? editingAccount.type : 'Corrente',
+            pixType: editingAccount.pixType || 'CPF/CNPJ',
+            pixKey: editingAccount.pixKey || '',
+            holderName: editingAccount.holderName || selectedClient?.name || '',
+            accountType: editingAccount.type === 'Pix' ? 'PIX' : 'BANK'
+          } : undefined}
+        />
       )}
     </div>
   );
