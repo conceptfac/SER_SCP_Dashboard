@@ -16,6 +16,7 @@ const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [language, setLanguage] = useState<Language>('pt-br');
   const [activeView, setActiveView] = useState('dashboard');
+  const [viewParams, setViewParams] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const t = TRANSLATIONS[language];
@@ -183,6 +184,7 @@ const App: React.FC = () => {
         language={language} 
         onNavigate={(view) => {
           setActiveView(view);
+          setViewParams(null);
           setIsSidebarOpen(false); // Close sidebar on mobile after navigate
         }}
         activeView={activeView}
@@ -197,12 +199,16 @@ const App: React.FC = () => {
           onLanguageChange={setLanguage} 
           onMenuClick={toggleSidebar}
           onLogout={handleLogout}
+          onNavigate={(view, params) => {
+            setActiveView(view);
+            setViewParams(params);
+          }}
         />
         
         <main className="flex-1 pt-16 p-4 md:p-8 overflow-y-auto">
           <div className="max-w-7xl mx-auto">
             {activeView === 'dashboard' && currentRole !== UserRole.CLIENTE && <Dashboard user={user!} language={language} />}
-            {activeView === 'clients' && currentRole !== UserRole.CLIENTE && <Customers role={currentRole} language={language} />}
+            {activeView === 'clients' && currentRole !== UserRole.CLIENTE && <Customers role={currentRole} language={language} userId={user!.id} userName={user!.name} initialOpenId={viewParams?.openClientId} openTimestamp={viewParams?.timestamp} />}
             {activeView === 'scp-info' && currentRole !== UserRole.CLIENTE && <SCPInfoView role={currentRole} language={language} />}
             {activeView === 'contracts' && <Contracts role={currentRole} language={language} />}
             {activeView === 'exec-reg' && (currentRole === UserRole.HEAD || currentRole === UserRole.EXECUTIVO_LEADER) && <Executives role={currentRole} language={language} userId={user!.id} />}

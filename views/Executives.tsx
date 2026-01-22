@@ -4,6 +4,15 @@ import { Executive, Language, UserRole } from '../types';
 import { TRANSLATIONS } from '../constants';
 import RegisterModal from '../components/RegisterModal';
 
+interface ExecutiveDisplay {
+  id: string;
+  name: string;
+  document: string;
+  email: string;
+  role: string;
+  status: string;
+}
+
 interface ExecutivesProps {
   role: UserRole;
   language: Language;
@@ -20,12 +29,23 @@ const ROLE_MAP: Record<number, string> = {
 const Executives: React.FC<ExecutivesProps> = ({ role, language, userId }) => {
   const t = TRANSLATIONS[language];
   const [showModal, setShowModal] = useState(false);
-  const [selectedExec, setSelectedExec] = useState<Executive | null>(null);
+  const [selectedExec, setSelectedExec] = useState<ExecutiveDisplay | null>(null);
   
-  const [executivesList, setExecutivesList] = useState<Executive[]>([]);
+  const [executivesList, setExecutivesList] = useState<ExecutiveDisplay[]>([]);
   const [searchName, setSearchName] = useState('');
   const [searchDocument, setSearchDocument] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active': return 'bg-green-100 text-green-700 border-green-200';
+      case 'pending': return 'bg-blue-100 text-blue-700 border-blue-200';
+      case 'denied': return 'bg-red-100 text-red-700 border-red-200';
+      case 'archiving': return 'bg-orange-100 text-orange-700 border-orange-200';
+      case 'archived': return 'bg-gray-900 text-white border-gray-900';
+      default: return 'bg-gray-100 text-gray-700 border-gray-200';
+    }
+  };
   
   const fetchExecutives = async () => {
     setIsLoading(true);
@@ -35,6 +55,11 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language, userId }) => {
       // Se for LÍDER, mostra apenas os executivos subordinados a ele
       if (role === UserRole.EXECUTIVO_LEADER) {
         query = query.eq('leader_id', userId);
+      }
+
+      // Se não for HEAD, esconde arquivados
+      if (role !== UserRole.HEAD) {
+        query = query.neq('account_status', 'archived');
       }
 
       if (searchName) {
@@ -50,12 +75,13 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language, userId }) => {
 
       if (error) throw error;
 
-      const mappedExecutives: Executive[] = (data || []).map((item: any) => ({
+      const mappedExecutives: ExecutiveDisplay[] = (data || []).map((item: any) => ({
         id: item.id.toString(),
         name: item.full_name || item.company_name || 'Sem Nome',
         document: item.cpf || item.cnpj || '',
         email: item.email || '',
-        role: ROLE_MAP[item.role as number] || 'Não definido'
+        role: ROLE_MAP[item.role as number] || 'Não definido',
+        status: item.account_status || 'pending'
       }));
       
       setExecutivesList(mappedExecutives);
@@ -70,7 +96,7 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language, userId }) => {
     fetchExecutives();
   }, []);
 
-  const handleOpenModal = (exec: Executive | null = null) => {
+  const handleOpenModal = (exec: ExecutiveDisplay | null = null) => {
     setSelectedExec(exec);
     setShowModal(true);
   };
@@ -123,16 +149,22 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language, userId }) => {
               <tr className="bg-gray-50/50 border-b border-gray-100">
                 <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t.name}</th>
                 <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t.role}</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t.actions}</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">{t.status}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {executivesList.map(exec => (
                 <tr key={exec.id} className="hover:bg-gray-50/50 transition-colors group">
-                  <td className="px-6 py-4 text-secondary font-normal">{exec.name}</td>
+                  <td className="px-6 py-4 text-secondary font-normal">
+                    <button onClick={() => handleOpenModal(exec)} className="font-bold hover:text-primary hover:underline text-left">
+                      {exec.name}
+                    </button>
+                  </td>
                   <td className="px-6 py-4 text-xs font-bold text-primary uppercase tracking-widest font-normal">{exec.role}</td>
-                  <td className="px-6 py-4">
-                    <button onClick={() => handleOpenModal(exec)} className="text-secondary font-bold text-[10px] uppercase hover:underline tracking-widest">Detalhes</button>
+                  <td className="px-6 py-4 text-right">
+                     <span className={`px-3 py-1 rounded-full text-[10px] font-extrabold border uppercase tracking-wider ${getStatusColor(exec.status)}`}>
+                       {t[exec.status as keyof typeof t] || exec.status}
+                     </span>
                   </td>
                 </tr>
               ))}
@@ -149,6 +181,7 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language, userId }) => {
           initialData={selectedExec}
           entityType="executive"
           language={language}
+          userRole={role}
         />
       )}
     </div>

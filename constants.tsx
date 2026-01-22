@@ -98,6 +98,9 @@ export const TRANSLATIONS = {
     number: 'Number',
     active: 'Active',
     pending: 'Pending',
+    denied: 'Denied',
+    archiving: 'Archiving',
+    archived: 'Archived',
     unfit: 'Unfit',
     fit: 'Fit',
     role: 'Role',
@@ -137,6 +140,14 @@ export const TRANSLATIONS = {
     generateEdition: 'Generate Magic Edition',
     aiThinking: 'Gemini is thinking...',
     noResult: 'No results generated yet',
+    notifications: 'Notifications',
+    archiveRequestTitle: 'Archive Request',
+    archiveRequestMessage: 'Executive {executive} requested archiving for client {client}',
+    view: 'View',
+    accept: 'Accept',
+    deny: 'Deny',
+    requestAccepted: 'Request Accepted',
+    requestDenied: 'Request Denied',
     monthsNames: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
     daysShort: ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
   },
@@ -185,6 +196,9 @@ export const TRANSLATIONS = {
     number: 'Número',
     active: 'Activo',
     pending: 'Pendiente',
+    denied: 'Denegado',
+    archiving: 'Archivando',
+    archived: 'Archivado',
     unfit: 'No Apto',
     fit: 'Apto',
     role: 'Cargo',
@@ -224,6 +238,14 @@ export const TRANSLATIONS = {
     generateEdition: 'Generar Edición Mágica',
     aiThinking: 'Gemini está pensando...',
     noResult: 'Ningún resultado generado todavía',
+    notifications: 'Notificaciones',
+    archiveRequestTitle: 'Solicitud de Archivo',
+    archiveRequestMessage: 'El ejecutivo {executive} solicitó archivar al cliente {client}',
+    view: 'Ver',
+    accept: 'Aceptar',
+    deny: 'Rechazar',
+    requestAccepted: 'Solicitud Aceptada',
+    requestDenied: 'Solicitud Rechazada',
     monthsNames: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Setembre', 'Octubre', 'Noviembre', 'Diciembre'],
     daysShort: ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá']
   },
@@ -272,6 +294,9 @@ export const TRANSLATIONS = {
     number: 'Número',
     active: 'Ativo',
     pending: 'Pendente',
+    denied: 'Negado',
+    archiving: 'Arquivando',
+    archived: 'Arquivado',
     unfit: 'Não Apto',
     fit: 'Apto',
     role: 'Cargo',
@@ -311,7 +336,59 @@ export const TRANSLATIONS = {
     generateEdition: 'Gerar Edição Mágica',
     aiThinking: 'Gemini está pensando...',
     noResult: 'Nenhum resultado gerado ainda',
+    notifications: 'Notificações',
+    archiveRequestTitle: 'Solicitação de Arquivamento',
+    archiveRequestMessage: 'O executivo {executive} solicitou o arquivamento do cadastro de {client}',
+    view: 'Visualizar',
+    accept: 'Aceitar',
+    deny: 'Negar',
+    requestAccepted: 'Solicitação Aceita',
+    requestDenied: 'Solicitação Negada',
     monthsNames: ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'],
     daysShort: ['Do', 'Se', 'Te', 'Qu', 'Qu', 'Se', 'Sá']
   }
 };
+
+
+export const ROLE_MAP: Record<number, string> = {
+  0: 'HEAD',
+  1: 'Executivo Líder',
+  2: 'Executivo',
+  3: 'Financeiro'
+};
+
+// Adicione isso ao final de src/constants.ts
+
+export const DOC_CATEGORY_MAP: Record<number, string> = {
+  1: 'Identidade',
+  2: 'Contrato',
+  3: 'Residência',
+  4: 'Outros'
+};
+
+export const DOC_TYPE_MAP: Record<number, string> = {
+  1: 'RG',
+  2: 'CPF',
+  3: 'CNH',
+  4: 'CIN',
+  5: 'Passaporte',
+  6: 'Comprovante de Residência'
+};
+
+export const DOC_STATUS_MAP: Record<number, 'Ativo' | 'Pendente' | 'Rejeitado'> = {
+  1: 'Pendente',
+  2: 'Ativo',
+  3: 'Rejeitado'
+};
+
+// Aproveite e exporte essas também, pois o RegisterModal usa no upload:
+export const DOC_VALUE_TO_ID: Record<string, number> = {
+  'RG': 1,
+  'CPF': 2,
+  'CNH': 3,
+  'CIN': 4,
+  'Passaporte': 5,
+  'Residencia': 6
+};
+
+export const ACCEPTED_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.doc', '.docx', '.xls', '.xlsx', '.pdf', '.ppt', '.pptx', '.txt'];

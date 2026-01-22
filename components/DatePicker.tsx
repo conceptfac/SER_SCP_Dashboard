@@ -10,9 +10,10 @@ interface DatePickerProps {
   language: Language;
   placeholder?: string;
   className?: string;
+  disabled?: boolean;
 }
 
-const DatePicker: React.FC<DatePickerProps> = ({ label, value, onChange, language, placeholder, className }) => {
+const DatePicker: React.FC<DatePickerProps> = ({ label, value, onChange, language, placeholder, className, disabled }) => {
   const [isOpen, setIsOpen] = useState(false);
   const t = TRANSLATIONS[language];
   const containerRef = useRef<HTMLDivElement>(null);
@@ -100,8 +101,8 @@ const DatePicker: React.FC<DatePickerProps> = ({ label, value, onChange, languag
     <div className={`relative ${className}`} ref={containerRef}>
       {label && <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">{label}</label>}
       <div 
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-between w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-lg cursor-pointer hover:border-secondary/30 transition-all"
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`flex items-center justify-between w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-lg transition-all ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-secondary/30'}`}
       >
         <span className={`text-sm ${!value ? 'text-gray-400' : 'text-secondary font-medium'}`}>
           {value ? formatDateDisplay(value) : (placeholder || 'DD/MM/AAAA')}
