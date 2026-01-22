@@ -7,6 +7,7 @@ import RegisterModal from '../components/RegisterModal';
 interface ExecutivesProps {
   role: UserRole;
   language: Language;
+  userId: string;
 }
 
 const ROLE_MAP: Record<number, string> = {
@@ -16,7 +17,7 @@ const ROLE_MAP: Record<number, string> = {
   3: 'Financeiro'
 };
 
-const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
+const Executives: React.FC<ExecutivesProps> = ({ role, language, userId }) => {
   const t = TRANSLATIONS[language];
   const [showModal, setShowModal] = useState(false);
   const [selectedExec, setSelectedExec] = useState<Executive | null>(null);
@@ -30,6 +31,11 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
     setIsLoading(true);
     try {
       let query = supabase.from('executives').select('*');
+
+      // Se for LÍDER, mostra apenas os executivos subordinados a ele
+      if (role === UserRole.EXECUTIVO_LEADER) {
+        query = query.eq('leader_id', userId);
+      }
 
       if (searchName) {
         query = query.or(`full_name.ilike.%${searchName}%,company_name.ilike.%${searchName}%`);

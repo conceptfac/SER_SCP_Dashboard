@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS public.documents (
     file_url text NOT NULL, -- URL do documento armazenado (S3, Supabase Storage, etc)
     
     -- Status do documento
-    status int NOT NULL CHECK (status IN (1,2,3)), -- 1=enviado, 2=aprovado, 3=rejeitado
+    status int NOT NULL CHECK (status IN (1,2,3)), -- 1=pendente, 2=aprovado, 3=rejeitado
 
     -- Propriedade (cliente ou executivo)
     owner_id bigint NOT NULL,

@@ -1,13 +1,15 @@
 
 import React, { useState, useEffect } from 'react';
+import { supabase } from './supabaseClient';
 import { User, UserRole, Language } from './types';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Dashboard from './views/Dashboard';
-import Clients from './views/Clients';
+import Customers from './views/Customers';
 import SCPInfoView from './views/SCPInfo';
 import Contracts from './views/Contracts';
 import Executives from './views/Executives';
+import Login from './components/Login';
 import { TRANSLATIONS } from './constants';
 
 const App: React.FC = () => {
@@ -18,31 +20,102 @@ const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const t = TRANSLATIONS[language];
 
-  // Initial setup - simulating login
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const initialUser: User = {
-        id: '1',
-        name: 'Carlos Mendes',
-        email: 'carlos.mendes@ser-pro.com',
-        role: UserRole.HEAD
-      };
-      setUser(initialUser);
-      setIsLoading(false);
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, []);
+  const fetchUserProfile = async (userId: string, email: string) => {
+    const cleanEmail = email.trim();
+    try {
+      console.log('Buscando perfil para:', cleanEmail);
+      
+      // 1. Tenta buscar perfil de executivo
+      const { data: execData, error } = await supabase
+        .from('executives')
+        .select('*')
+        .ilike('email', cleanEmail)
+        .maybeSingle();
 
-  const handleRoleChange = (role: UserRole) => {
-    if (user) {
-      setUser({ ...user, role });
-      if (role === UserRole.CLIENTE && (activeView === 'dashboard' || activeView === 'scp-info' || activeView === 'exec-reg')) {
-        setActiveView('contracts');
+      if (execData) {
+        console.log('Perfil Executivo encontrado. Role:', execData.role);
+        
+        // Mapeamento explícito para garantir que o número do banco corresponda ao Enum correto
+        let finalRole: UserRole = UserRole.CLIENTE;
+        const dbRole = Number(execData.role);
+
+        // Mapeia 0, 1, 2, 3 para os Enums corretos (independente do valor interno do Enum)
+        if (dbRole === 0) finalRole = UserRole.HEAD;
+        else if (dbRole === 1) finalRole = UserRole.EXECUTIVO_LEADER;
+        else if (dbRole === 2) finalRole = UserRole.EXECUTIVO;
+        else if (dbRole === 3) finalRole = UserRole.FINANCEIRO;
+        
+        console.log('Role final aplicada:', finalRole);
+
+        setUser({
+          id: execData.id.toString(),
+          name: execData.full_name,
+          email: execData.email,
+          role: finalRole
+        });
+        return;
       }
+
+      // 2. Se não achou executivo, tenta buscar perfil de cliente
+      const { data: custData } = await supabase
+        .from('customers')
+        .select('*')
+        .ilike('email', cleanEmail)
+        .maybeSingle();
+
+      if (custData) {
+        console.log('Perfil Cliente encontrado.');
+        setUser({
+          id: custData.id.toString(),
+          name: custData.full_name,
+          email: custData.email,
+          role: UserRole.CLIENTE
+        });
+        return;
+      }
+
+      // 3. Fallback: Usuário existe no Auth mas não nas tabelas públicas
+      console.log('Perfil NÃO encontrado nas tabelas públicas. Usando fallback.');
+      setUser({
+        id: userId,
+        name: cleanEmail.split('@')[0],
+        email: cleanEmail,
+        role: UserRole.CLIENTE
+      });
+    } catch (error) {
+      console.error('Erro ao buscar perfil:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+  useEffect(() => {
+    // Verifica sessão atual
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        fetchUserProfile(session.user.id, session.user.email!);
+      } else {
+        setIsLoading(false);
+      }
+    });
+
+    // Escuta mudanças na autenticação
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        fetchUserProfile(session.user.id, session.user.email!);
+      } else {
+        setUser(null);
+        setIsLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+  };
 
   if (isLoading) {
     return (
@@ -55,7 +128,35 @@ const App: React.FC = () => {
     );
   }
 
-  const currentRole = user?.role || UserRole.CLIENTE;
+  if (!user) {
+    return <Login onLoginSuccess={() => {}} />;
+  }
+
+  /* Código antigo de simulação removido */
+  /*
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const initialUser: User = { ... };
+      setUser(initialUser);
+      setIsLoading(false);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, []);
+  */
+
+  const handleRoleChange = (role: UserRole) => {
+    if (user) {
+      setUser({ ...user, role });
+      if (role === UserRole.CLIENTE && (activeView === 'dashboard' || activeView === 'scp-info' || activeView === 'exec-reg')) {
+        setActiveView('contracts');
+      }
+    }
+  };
+
+  const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+
+  // Usa verificação explícita de undefined para não quebrar com role 0 (HEAD)
+  const currentRole = user?.role !== undefined ? user.role : UserRole.CLIENTE;
 
   return (
     <div className="min-h-screen bg-white flex overflow-x-hidden font-sans">
@@ -95,15 +196,16 @@ const App: React.FC = () => {
           language={language} 
           onLanguageChange={setLanguage} 
           onMenuClick={toggleSidebar}
+          onLogout={handleLogout}
         />
         
         <main className="flex-1 pt-16 p-4 md:p-8 overflow-y-auto">
           <div className="max-w-7xl mx-auto">
             {activeView === 'dashboard' && currentRole !== UserRole.CLIENTE && <Dashboard user={user!} language={language} />}
-            {activeView === 'clients' && currentRole !== UserRole.CLIENTE && <Clients role={currentRole} language={language} />}
+            {activeView === 'clients' && currentRole !== UserRole.CLIENTE && <Customers role={currentRole} language={language} />}
             {activeView === 'scp-info' && currentRole !== UserRole.CLIENTE && <SCPInfoView role={currentRole} language={language} />}
             {activeView === 'contracts' && <Contracts role={currentRole} language={language} />}
-            {activeView === 'exec-reg' && currentRole === UserRole.HEAD && <Executives role={currentRole} language={language} />}
+            {activeView === 'exec-reg' && (currentRole === UserRole.HEAD || currentRole === UserRole.EXECUTIVO_LEADER) && <Executives role={currentRole} language={language} userId={user!.id} />}
             
             {activeView === 'dashboard' && currentRole === UserRole.CLIENTE && (
               <div className="flex flex-col items-center justify-center h-64 text-center animate-in fade-in zoom-in duration-300 px-4">

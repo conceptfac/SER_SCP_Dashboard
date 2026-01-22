@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { BANKS, TRANSLATIONS } from '../constants';
 import { Language } from '../types';
 import { BankAccountCardData } from './BankAccountCard';
+import bankIconsAtlas from '../imgs/bank_icons/bank_icons_atlas.json';
+import bankIconsSprite from '../imgs/bank_icons/bank_icons_atlas.png';
 
 export interface NewBankData {
   bankCode: string;
@@ -122,6 +124,28 @@ const AddBankModal: React.FC<AddBankModalProps> = ({ isOpen, onClose, onSave, ho
     }`;
   };
 
+  const renderBankIcon = (code: string) => {
+    const iconName = `BankIcon${code.trim()}`;
+    const iconData = (bankIconsAtlas.frames as any)[iconName];
+    const size = 48; // w-12 h-12 (48px)
+    const scale = size / 64;
+
+    if (!iconData) return <span className="text-[10px] font-bold text-gray-400">{code}</span>;
+
+    return (
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          backgroundImage: `url(${bankIconsSprite})`,
+          backgroundPosition: `-${iconData.frame.x * scale}px -${iconData.frame.y * scale}px`,
+          backgroundSize: `${bankIconsAtlas.meta.size.w * scale}px ${bankIconsAtlas.meta.size.h * scale}px`,
+          backgroundRepeat: 'no-repeat'
+        }}
+      />
+    );
+  };
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={onClose}></div>
@@ -156,9 +180,14 @@ const AddBankModal: React.FC<AddBankModalProps> = ({ isOpen, onClose, onSave, ho
                   <label className={`block text-[10px] font-bold uppercase mb-2 tracking-widest ${fieldErrors.bankCode ? 'text-red-500' : 'text-gray-400'}`}>
                     Instituição Bancária (*)
                   </label>
-                  <select className={getInputClass('bankCode')} value={formData.bankCode} onChange={(e) => setFormData({...formData, bankCode: e.target.value})}>
-                    {BANKS.map(bank => <option key={bank.code} value={bank.code}>{bank.code} - {bank.name}</option>)}
-                  </select>
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-white rounded-2xl border border-gray-100 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+                      {renderBankIcon(formData.bankCode)}
+                    </div>
+                    <select className={`${getInputClass('bankCode')} flex-1`} value={formData.bankCode} onChange={(e) => setFormData({...formData, bankCode: e.target.value})}>
+                      {BANKS.map(bank => <option key={bank.code} value={bank.code}>{bank.code} - {bank.name}</option>)}
+                    </select>
+                  </div>
                   {fieldErrors.bankCode && <p className="text-[10px] font-bold text-red-500 mt-1 uppercase tracking-tighter">Campo obrigatório</p>}
                 </div>
 
@@ -200,9 +229,14 @@ const AddBankModal: React.FC<AddBankModalProps> = ({ isOpen, onClose, onSave, ho
                 </h5>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <select className={getInputClass('pixType')} value={formData.pixType} onChange={(e) => setFormData({...formData, pixType: e.target.value})}>
-                      <option>CPF / CNPJ</option><option>E-mail</option><option>Celular</option><option>Chave Aleatória</option>
-                    </select>
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-white rounded-2xl border border-gray-100 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+                        {renderBankIcon('0')}
+                      </div>
+                      <select className={`${getInputClass('pixType')} flex-1`} value={formData.pixType} onChange={(e) => setFormData({...formData, pixType: e.target.value})}>
+                        <option>CPF / CNPJ</option><option>E-mail</option><option>Celular</option><option>Chave Aleatória</option>
+                      </select>
+                    </div>
                     {fieldErrors.pixType && <p className="text-[10px] font-bold text-red-500 mt-1 uppercase tracking-tighter">Campo obrigatório</p>}
                   </div>
                   <div>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Contract, Language, UserRole } from '../types';
 import { TRANSLATIONS } from '../constants';
@@ -28,6 +27,12 @@ const Contracts: React.FC<ContractsProps> = ({ role, language }) => {
   const [months, setMonths] = useState<number>(12);
   const [startDate, setStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [dividendMap, setDividendMap] = useState<DividendRow[]>([]);
+
+  // Search State
+  const [searchTerm, setSearchTerm] = useState('');
+  const [contractNumber, setContractNumber] = useState('');
+  const [customerName, setCustomerName] = useState('');
+  const [consultantName, setConsultantName] = useState('');
 
   // Formatting helpers
   const formatCurrency = (val: number) => {
@@ -118,6 +123,19 @@ const Contracts: React.FC<ContractsProps> = ({ role, language }) => {
     { id: '1', number: 'CTR-2024-001', status: 'Vigente', amount: 50000, rate: 1.5, months: 12, startDate: '2024-01-01', endDate: '2025-01-01', clientName: 'Fulano da Silva', executiveName: 'Consultor Master' },
   ];
 
+  const handleSearch = () => {
+    console.log('Pesquisando contratos:', { searchTerm, contractNumber, customerName, consultantName });
+    // Aqui você implementaria a lógica real de busca
+  };
+
+  const handleClearSearch = () => {
+    setSearchTerm('');
+    setContractNumber('');
+    setCustomerName('');
+    setConsultantName('');
+    // Resetar a busca aqui
+  };
+
   return (
     <div className="space-y-6 md:space-y-8 animate-in fade-in duration-300 font-sans">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -131,6 +149,64 @@ const Contracts: React.FC<ContractsProps> = ({ role, language }) => {
             {t.createContract}
           </button>
         )}
+      </div>
+
+      {/* Painel de Pesquisa */}
+      <div className={`bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100 grid grid-cols-1 sm:grid-cols-2 ${role === UserRole.HEAD ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-4`}>
+        <div>
+          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Número do Contrato</label>
+          <input 
+            type="text" 
+            value={contractNumber}
+            onChange={(e) => setContractNumber(e.target.value)}
+            className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none text-sm text-secondary" 
+            placeholder="CTR-0000-000" 
+          />
+        </div>
+        <div>
+          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Nome do Cliente</label>
+          <input 
+            type="text" 
+            value={customerName}
+            onChange={(e) => setCustomerName(e.target.value)}
+            className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none text-sm text-secondary" 
+            placeholder="Nome do cliente" 
+          />
+        </div>
+        {role === UserRole.HEAD && (
+          <div>
+            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Consultor</label>
+            <input 
+              type="text" 
+              value={consultantName}
+              onChange={(e) => setConsultantName(e.target.value)}
+              className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none text-sm text-secondary" 
+              placeholder="Nome do consultor" 
+            />
+          </div>
+        )}
+        <div>
+          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Status</label>
+          <select 
+            className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none text-sm text-secondary"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          >
+            <option value="">Todos</option>
+            <option value="Vigente">Vigente</option>
+            <option value="Encerrado">Encerrado</option>
+            <option value="Cancelado">Cancelado</option>
+            <option value="Pendente">Pendente</option>
+          </select>
+        </div>
+        <div className="flex items-end gap-2">
+          <button 
+            onClick={handleSearch}
+            className="w-full btn-secondary-style"
+          >
+            {t.search}
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">

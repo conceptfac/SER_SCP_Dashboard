@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
-import { Language } from '../types';
+import { Language, UserRole } from '../types';
 import { TRANSLATIONS, BRAZILIAN_STATES, BANKS } from '../constants';
 import DatePicker from './DatePicker';
 import BankAccountCard, { BankAccountCardData } from './BankAccountCard';
@@ -13,6 +13,8 @@ interface UploadedDocument {
   name: string;
   date: string;
   status: 'Ativo' | 'Pendente' | 'Rejeitado';
+  url: string;
+  filePath: string;
 }
 
 interface RegisterModalProps {
@@ -22,6 +24,7 @@ interface RegisterModalProps {
   initialData?: any;
   entityType: 'executive' | 'client';
   language: Language;
+  userRole?: UserRole;
 }
 
 const MARITAL_STATUS_MAP: Record<string, number> = {
@@ -58,9 +61,43 @@ const PIX_KEY_TYPE_MAP: Record<number, string> = {
   4: 'Aleatória'
 };
 
-const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onSuccess, initialData, entityType, language }) => {
+const DOC_CATEGORY_MAP: Record<number, string> = {
+  1: 'Identidade',
+  2: 'Contrato',
+  3: 'Residência',
+  4: 'Outros'
+};
+
+const DOC_TYPE_MAP: Record<number, string> = {
+  1: 'RG',
+  2: 'CPF',
+  3: 'CNH',
+  4: 'CIN',
+  5: 'Passaporte',
+  6: 'Comprovante de Residência'
+};
+
+const DOC_STATUS_MAP: Record<number, 'Ativo' | 'Pendente' | 'Rejeitado'> = {
+  1: 'Pendente',
+  2: 'Ativo',
+  3: 'Rejeitado'
+};
+
+const DOC_VALUE_TO_ID: Record<string, number> = {
+  'RG': 1,
+  'CPF': 2,
+  'CNH': 3,
+  'CIN': 4,
+  'Passaporte': 5,
+  'Residencia': 6
+};
+
+const ACCEPTED_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.doc', '.docx', '.xls', '.xlsx', '.pdf', '.ppt', '.pptx', '.txt'];
+
+const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onSuccess, initialData, entityType, language, userRole }) => {
   const t = TRANSLATIONS[language];
   const TABS = [t.general, t.address, t.bankData, t.documents];
+  if (entityType === 'client') TABS.push(t.statusFlow);
   
   const [activeTabIndex, setActiveTabIndex] = useState(0);
   const [isPF, setIsPF] = useState(true);
@@ -74,10 +111,11 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onSucces
   const [bankAccounts, setBankAccounts] = useState<BankAccountCardData[]>([]);
   const [showAddBankModal, setShowAddBankModal] = useState(false);
   const [editingAccount, setEditingAccount] = useState<BankAccountCardData | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedDocType, setSelectedDocType] = useState('RG');
 
-  const [uploadedDocs, setUploadedDocs] = useState<UploadedDocument[]>([
-    { id: '1', type: 'RG', category: 'Identidade', name: 'identidade_joao.pdf', date: '10/06/2024 09:00', status: 'Ativo' }
-  ]);
+  const [uploadedDocs, setUploadedDocs] = useState<UploadedDocument[]>([]);
 
   const [formData, setFormData] = useState({ 
     name: '', document: '', email: '', birthDate: '', rg: '', phone: '', whatsapp: '',
@@ -321,9 +359,142 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onSucces
     }
   };
 
+  const fetchDocuments = async () => {
+    if (!initialData) return;
+    try {
+      const ownerType = entityType === 'client' ? 1 : 2;
+      const { data, error } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('owner_id', initialData.id)
+        .eq('owner_type', ownerType)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const mappedDocs = await Promise.all((data || []).map(async (doc: any) => {
+        // Gera uma URL assinada válida por 1 hora (3600 segundos)
+        // Isso funciona tanto para buckets públicos quanto privados
+        const { data: signedData } = await supabase.storage
+          .from('app-uploads')
+          .createSignedUrl(doc.file_url, 3600);
+
+        return {
+          id: doc.id.toString(),
+          type: DOC_TYPE_MAP[doc.type] || doc.type.toString(),
+          category: DOC_CATEGORY_MAP[doc.category] || 'Outros',
+          name: doc.file_url ? doc.file_url.split('/').pop() : 'Documento',
+          date: new Date(doc.created_at).toLocaleString('pt-BR'),
+          status: DOC_STATUS_MAP[doc.status] || 'Pendente',
+          url: signedData?.signedUrl || '#',
+          filePath: doc.file_url
+        };
+      }));
+
+      setUploadedDocs(mappedDocs);
+    } catch (error) {
+      console.error('Erro ao buscar documentos:', error);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      await handleFileUpload(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      await handleFileUpload(e.target.files[0]);
+    }
+  };
+
+  const handleFileUpload = async (file: File) => {
+    if (!initialData?.id) {
+      alert("É necessário salvar o cadastro antes de anexar documentos.");
+      return;
+    }
+
+    const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+    if (!ACCEPTED_EXTENSIONS.includes(fileExtension)) {
+      alert(`Formato de arquivo não suportado. Formatos aceitos: ${ACCEPTED_EXTENSIONS.join(', ')}`);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const folder = entityType === 'executive' ? 'executives' : 'customers';
+      const filePath = `${folder}/${initialData.id}/${file.name}`;
+      
+      const { error } = await supabase.storage
+        .from('app-uploads')
+        .upload(filePath, file, { upsert: true });
+
+      if (error) throw new Error(`Erro no Storage: ${error.message}`);
+
+      const typeId = DOC_VALUE_TO_ID[selectedDocType] || 1;
+      const categoryId = typeId === 6 ? 3 : 1; // 6 is Residencia -> Category 3, others -> Category 1
+      const ownerType = entityType === 'client' ? 1 : 2;
+
+      const { error: dbError } = await supabase.from('documents').insert({
+        category: categoryId, type: typeId, file_url: filePath, status: 1, owner_id: initialData.id, owner_type: ownerType, is_valid: true
+      });
+      
+      if (dbError) {
+        await supabase.storage.from('app-uploads').remove([filePath]);
+        throw new Error(`Erro no Banco de Dados: ${dbError.message}`);
+      }
+
+      await fetchDocuments();
+    } catch (error: any) {
+      console.error('Erro ao enviar arquivo:', error);
+      if (error.message.includes('row-level security')) {
+        alert('Erro de Permissão (RLS): Verifique se as políticas do Supabase permitem inserção para usuários anônimos.');
+      } else {
+        alert(`Erro ao enviar arquivo: ${error.message}`);
+      }
+    } finally { setIsLoading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
+  };
+
+  const handleDeleteDocument = async (doc: UploadedDocument) => {
+    if (doc.status === 'Ativo' && userRole !== UserRole.HEAD) return;
+
+    if (window.confirm(`Deseja realmente excluir o documento ${doc.name}?`)) {
+      try {
+        if (doc.filePath) {
+          const { error: storageError } = await supabase.storage
+            .from('app-uploads')
+            .remove([doc.filePath]);
+
+          if (storageError) throw new Error(`Erro ao excluir do Storage: ${storageError.message}`);
+        }
+
+        const { error } = await supabase.from('documents').delete().eq('id', doc.id);
+        if (error) throw error;
+        await fetchDocuments();
+      } catch (error: any) {
+        console.error('Erro ao excluir documento:', error);
+        alert(`Erro ao excluir documento: ${error.message || error}`);
+      }
+    }
+  };
+
   useEffect(() => {
-    if (isOpen && activeTabIndex === 2) {
-      fetchBankAccounts();
+    if (isOpen) {
+      if (activeTabIndex === 2) fetchBankAccounts();
+      if (activeTabIndex === 3) fetchDocuments();
     }
   }, [isOpen, activeTabIndex, initialData]);
 
@@ -532,6 +703,15 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onSucces
       alert('Erro ao salvar. Verifique os dados.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Apto': return 'bg-green-100 text-green-700 border-green-200';
+      case 'Pendente': return 'bg-orange-100 text-orange-700 border-orange-200';
+      case 'Não Apto': return 'bg-red-100 text-red-700 border-red-200';
+      default: return 'bg-gray-100 text-gray-700 border-gray-200';
     }
   };
 
@@ -871,15 +1051,16 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onSucces
 
             {activeTabIndex === 3 && (
               <div className="space-y-10 animate-in fade-in slide-in-from-left-2 duration-300">
-                <div className="p-10 bg-gray-50 border-2 border-dashed border-gray-200 rounded-[3rem] flex flex-col items-center text-center">
+                <div className={`p-10 bg-gray-50 border-2 border-dashed ${isDragging ? 'border-secondary bg-secondary/5' : 'border-gray-200'} rounded-[3rem] flex flex-col items-center text-center transition-colors`} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
                   <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center text-secondary mb-4 shadow-sm">
                     <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
                   </div>
                   <h4 className="text-sm font-black text-secondary uppercase tracking-[0.1em] mb-2">Central de Arquivos do Executivo</h4>
                   <p className="text-[11px] text-bodyText mb-8 max-lg">Anexe os documents necessários para validação do perfil.</p>
                   
+                  <input type="file" hidden ref={fileInputRef} onChange={handleFileSelect} accept={ACCEPTED_EXTENSIONS.join(',')} />
                   <div className="w-full max-xl flex flex-col sm:flex-row gap-4 items-center">
-                    <select className="w-full flex-1 px-5 py-3.5 bg-white border border-gray-100 rounded-2xl outline-none text-[11px] font-black uppercase tracking-widest shadow-sm appearance-none cursor-pointer text-secondary">
+                    <select className="w-full flex-1 px-5 py-3.5 bg-white border border-gray-100 rounded-2xl outline-none text-[11px] font-black uppercase tracking-widest shadow-sm appearance-none cursor-pointer text-secondary" value={selectedDocType} onChange={(e) => setSelectedDocType(e.target.value)}>
                       <optgroup label="Documento de Identidade * Obrigatório">
                         <option value="RG">RG</option>
                         <option value="CPF">CPF</option>
@@ -891,7 +1072,7 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onSucces
                         <option value="Residencia">Comprovante de Residência</option>
                       </optgroup>
                     </select>
-                    <button className="w-full sm:w-auto px-12 py-3.5 bg-secondary text-white text-[10px] font-black rounded-2xl shadow-2xl hover:opacity-95 uppercase tracking-[0.2em] transition-all transform hover:-translate-y-1">ANEXAR</button>
+                    <button onClick={() => fileInputRef.current?.click()} className="w-full sm:w-auto px-12 py-3.5 bg-secondary text-white text-[10px] font-black rounded-2xl shadow-2xl hover:opacity-95 uppercase tracking-[0.2em] transition-all transform hover:-translate-y-1">ANEXAR</button>
                   </div>
                 </div>
 
@@ -918,18 +1099,134 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onSucces
                               <td className="px-6 py-4 text-xs font-black text-secondary">{doc.type}</td>
                               <td className="px-6 py-4 text-[11px] text-bodyText font-bold text-secondary">{doc.name}</td>
                               <td className="px-6 py-4">
-                                <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase border ${doc.status === 'Ativo' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-orange-100 text-orange-700 border-orange-200'}`}>
+                                <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase border ${doc.status === 'Ativo' ? 'bg-green-100 text-green-700 border-green-200' : doc.status === 'Rejeitado' ? 'bg-red-100 text-red-700 border-red-200' : 'bg-orange-100 text-orange-700 border-orange-200'}`}>
                                   {doc.status}
                                 </span>
                               </td>
                               <td className="px-6 py-4 text-right">
-                                <button className="p-2 text-secondary hover:bg-secondary/10 rounded-xl transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg></button>
+                                <button onClick={() => window.open(doc.url, '_blank')} className="p-2 text-secondary hover:bg-secondary/10 rounded-xl transition-all mr-2" title="Visualizar"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg></button>
+                                {(doc.status !== 'Ativo' || userRole === UserRole.HEAD) && (
+                                  <button onClick={() => handleDeleteDocument(doc)} className="p-2 text-red-400 hover:bg-red-50 rounded-xl transition-all" title="Excluir">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                  </button>
+                                )}
                               </td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTabIndex === 4 && (
+              <div className="space-y-12 animate-in fade-in slide-in-from-left-2 duration-300 p-2">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-6">
+                    <div>
+                      <h4 className="text-xl font-bold text-secondary uppercase tracking-tighter font-display">Fluxo de Onboarding</h4>
+                      <p className="text-xs text-bodyText mt-1">Status atual: <span className="font-bold text-secondary">{initialData?.name || (entityType === 'executive' ? 'Executivo' : 'Cliente')}</span></p>
+                    </div>
+                    <span className={`px-5 py-2 rounded-full text-[10px] font-black shadow-sm border uppercase tracking-widest ${getStatusColor(initialData?.status || 'Pendente')}`}>{initialData?.status || 'Pendente'}</span>
+                </div>
+
+                <div className="flex items-start justify-between overflow-x-auto pb-8 gap-4 no-scrollbar">
+                  {[
+                    { label: 'Não Apto', desc: 'É necessário completar e regularizar todos dados do cliente;', s: 'rejected' },
+                    { label: 'Apto', desc: 'Cliente apto para o consultor lançar uma recomendação de aporte;', s: 'done' },
+                    { label: 'Análise', desc: 'Analise automática dos dados do cliente após recomendação;', s: 'next' },
+                    { label: 'Senha', desc: 'O cliente deve validar o email e definir uma senha de acesso;', s: 'next' },
+                    { label: 'Onboarding', desc: 'O cliente deve ter todos os passos do onboarding concluidos;', s: 'next' },
+                    { label: 'Cadastrado', desc: 'O cliente assinou o contrato e esta habilitado para novos;', s: 'next' }
+                  ].map((step, i, arr) => (
+                    <React.Fragment key={i}>
+                      <div className="flex flex-col items-center min-w-[160px] text-center group">
+                        <div className={`w-14 h-14 rounded-full flex items-center justify-center border-4 transition-all duration-500 shadow-lg ${
+                          step.s === 'done' ? 'bg-white border-green-500 text-green-500 ring-4 ring-green-100' : 
+                          step.s === 'rejected' ? 'bg-white border-red-500 text-red-500 ring-4 ring-red-100' :
+                          'bg-gray-100 border-gray-300 text-gray-400'}`}>
+                          
+                          {step.s === 'done' && (
+                            <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
+                          )}
+                          {step.s === 'rejected' && (
+                            <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg>
+                          )}
+                          {step.s === 'next' && (
+                            <svg className="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                          )}
+                        </div>
+                        <h5 className="mt-4 text-[11px] font-black text-secondary uppercase tracking-widest">{step.label}</h5>
+                        <p className="mt-2 text-[9px] text-bodyText leading-tight max-w-[140px] px-2">{step.desc}</p>
+                      </div>
+                      {i < arr.length - 1 && (
+                        <div className="pt-7 flex-1 min-w-[30px] flex items-center justify-center">
+                          <svg className="w-8 h-8 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+                        </div>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </div>
+
+                <div className="bg-gray-50/50 p-6 rounded-3xl border border-gray-100">
+                  <h6 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6 px-1">Legenda de Status</h6>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-4 h-4 bg-green-500 rounded-full shadow-sm"></div>
+                      <span className="text-[11px] font-bold text-secondary">Etapa concluída</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-4 h-4 bg-gray-300 rounded-full shadow-sm flex items-center justify-center text-[8px] text-white"></div>
+                      <span className="text-[11px] font-bold text-secondary">Próxima etapas</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-4 h-4 bg-orange-500 rounded-full shadow-sm"></div>
+                      <span className="text-[11px] font-bold text-secondary">Revisão Manual</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-4 h-4 bg-red-500 rounded-full shadow-sm flex items-center justify-center text-[10px] text-white">✕</div>
+                      <span className="text-[11px] font-bold text-secondary">Rejeitado</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className={`p-8 rounded-[2.5rem] border-2 shadow-sm transition-all animate-in fade-in zoom-in duration-300 ${initialData?.status === 'Apto' ? 'bg-green-50 border-green-200 text-green-900' : 'bg-red-50 border-red-200 text-red-900'}`}>
+                  <div className="flex items-start gap-5">
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-md ${initialData?.status === 'Apto' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
+                        {initialData?.status === 'Apto' ? (
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
+                        ) : (
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg>
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <h5 className="text-xl font-black uppercase tracking-tighter">Cliente {initialData?.status === 'Apto' ? 'Apto' : 'Inapto'}</h5>
+                        <p className="text-sm mt-1 opacity-80 leading-relaxed font-medium">
+                          {initialData?.status === 'Apto' 
+                            ? 'Este cliente atende a todos os requisitos obrigatórios e está apto para realizar operações.'
+                            : 'Atenção: O cadastro deste cliente possui pendências críticas que impossibilitam o aporte imediato.'}
+                        </p>
+
+                        <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-12">
+                            <p className="text-[10px] font-black uppercase tracking-widest col-span-full mb-2 opacity-60">Requisitos Atendidos:</p>
+                            {[
+                              { label: 'Dados Pessoais', ok: true },
+                              { label: 'Idade mínima 18 anos', ok: true },
+                              { label: 'E-mail confirmado', ok: true },
+                              { label: 'Documentos de Identificação', ok: initialData?.status === 'Apto' },
+                              { label: 'Comprovante de residência', ok: true },
+                              { label: 'Dados bancários', ok: initialData?.status === 'Apto' }
+                            ].map((req, i) => (
+                              <div key={i} className="flex items-center gap-3">
+                                <div className={`w-4 h-4 rounded-full flex items-center justify-center ${req.ok ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
+                                  <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d={req.ok ? "M5 13l4 4L19 7" : "M6 18L18 6M6 6l12 12"}/></svg>
+                                </div>
+                                <span className="text-xs font-bold tracking-tight">{req.label}</span>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
                   </div>
                 </div>
               </div>

@@ -1,4 +1,6 @@
 import React from 'react';
+import bankIconsAtlas from '../imgs/bank_icons/bank_icons_atlas.json';
+import bankIconsSprite from '../imgs/bank_icons/bank_icons_atlas.png';
 
 export interface BankAccountCardData {
   id: string;
@@ -23,10 +25,30 @@ interface BankAccountCardProps {
 }
 
 const BankAccountCard: React.FC<BankAccountCardProps> = ({ account, onToggle, onDelete, onEdit }) => {
+  const iconName = `BankIcon${account.bankCode.trim()}`;
+  const iconData = (bankIconsAtlas.frames as any)[iconName];
+  const scale = 56 / 64; // Container é w-14 (56px), ícone original é 64px
+
   return (
     <div className={`p-6 rounded-[2rem] border transition-all flex items-center justify-between ${account.isActive ? 'bg-secondary/5 border-secondary/30 shadow-sm' : 'bg-white border-gray-100'}`}>
       <div className="flex items-center gap-5">
-        <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-100 font-black text-secondary text-sm shadow-sm">{account.bankCode}</div>
+        <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-gray-100 font-black text-secondary text-sm shadow-sm overflow-hidden">
+          {iconData ? (
+            <div
+              style={{
+                width: '100%',
+                height: '100%',
+                backgroundImage: `url(${bankIconsSprite})`,
+                backgroundPosition: `-${iconData.frame.x * scale}px -${iconData.frame.y * scale}px`,
+                backgroundSize: `${bankIconsAtlas.meta.size.w * scale}px ${bankIconsAtlas.meta.size.h * scale}px`,
+                backgroundRepeat: 'no-repeat'
+              }}
+              title={account.bankName}
+            />
+          ) : (
+            account.bankCode
+          )}
+        </div>
         <div>
           <p className="text-sm font-black text-secondary uppercase tracking-tight">{account.bankName}</p>
           {account.type !== 'Pix' && (

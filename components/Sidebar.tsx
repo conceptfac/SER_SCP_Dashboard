@@ -34,9 +34,9 @@ const Sidebar: React.FC<SidebarProps> = ({ role, language, onNavigate, activeVie
     },
     {
       id: 'executives',
-      label: t.headSession,
+      label: role === UserRole.EXECUTIVO_LEADER ? t.leaderSession : t.headSession,
       icon: Icons.executives,
-      role: [UserRole.HEAD],
+      role: [UserRole.HEAD, UserRole.EXECUTIVO_LEADER],
       subItems: [
         { id: 'regExec', label: t.executives, view: 'exec-reg' }
       ]
