@@ -5,6 +5,9 @@
   --e-global-color-buttons: #014F43;
   --e-global-color-accent: #2F54A0;
   --e-global-color-dark: #211F38;
+  --e-global-color-white: #FFFFFF;
+  --e-global-color-background: #F8FAFC;
+  --e-global-color-light-gray: #F1F5F9;
   color-scheme: light !important;
 }
 
@@ -15,12 +18,12 @@ div::-webkit-scrollbar,
 section::-webkit-scrollbar {
   width: 8px !important;
   height: 8px !important;
-  background-color: #F1F5F9 !important;
+  background-color: var(--e-global-color-light-gray) !important;
 }
 
 *::-webkit-scrollbar-track, 
 body::-webkit-scrollbar-track {
-  background: #F1F5F9 !important;
+  background: var(--e-global-color-light-gray) !important;
   border-radius: 10px !important;
 }
 
@@ -28,7 +31,7 @@ body::-webkit-scrollbar-track {
 body::-webkit-scrollbar-thumb {
   background-color: var(--e-global-color-primary) !important;
   border-radius: 10px !important;
-  border: 2px solid #F1F5F9 !important;
+  border: 2px solid var(--e-global-color-light-gray) !important;
 }
 
 /* 2. OCULTAR SPIN BUTTONS */
@@ -39,14 +42,16 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 input[type="number"] {
-  -moz-appearance: textfield !important;
+  appearance: textfield;        /* propriedade padrão */
+  -moz-appearance: textfield;   /* Firefox antigo */
 }
+
 
 /* 3. ESTILOS BASE */
 body {
   font-family: 'DM Sans', sans-serif;
   color: var(--e-global-color-text);
-  background-color: #F8FAFC;
+  background-color: var(--e-global-color-background);
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
 }
@@ -60,11 +65,11 @@ h1, h2, h3, h4, h5, h6 {
 input, select, textarea {
   accent-color: var(--e-global-color-primary);
   outline: none !important;
-  color: #102C65 !important; /* Azul Escuro Forçado */
+  color: var(--e-global-color-secondary) !important;
 }
 
 input::placeholder, textarea::placeholder {
-  color: #7E8EAE !important;
+  color: var(--e-global-color-text) !important;
 }
 
 .no-scrollbar::-webkit-scrollbar {
@@ -74,4 +79,67 @@ input::placeholder, textarea::placeholder {
 .no-scrollbar {
   -ms-overflow-style: none !important;
   scrollbar-width: none !important;
+}
+
+/* 4. COMPONENT STYLES (from inline/utility classes) */
+
+/* Logo in Sidebar */
+.sidebar-logo {
+  display: block;
+  max-width: 180px;
+  filter: brightness(0) invert(1);
+}
+
+/* Loading Spinner */
+.loading-spinner {
+  width: 4rem; /* w-16 */
+  height: 4rem; /* h-16 */
+  border-width: 4px;
+  border-color: var(--e-global-color-primary);
+  border-top-color: transparent;
+  border-radius: 9999px; /* rounded-full */
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Primary Button Style */
+.btn-primary-style {
+  padding: 0.625rem 1.5rem; /* py-2.5 px-6 */
+  background-color: var(--e-global-color-buttons);
+  color: var(--e-global-color-white);
+  border-radius: 0.75rem; /* rounded-xl */
+  font-weight: 700;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1); /* shadow-lg */
+  gap: 0.5rem; /* gap-2 */
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+.btn-primary-style:hover {
+  opacity: 0.9;
+}
+
+/* Secondary Button Style */
+.btn-secondary-style {
+  padding-top: 0.5rem; /* py-2 */
+  padding-bottom: 0.5rem;
+  background-color: var(--e-global-color-secondary);
+  color: var(--e-global-color-white);
+  font-weight: 700;
+  border-radius: 0.5rem; /* rounded-lg */
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); /* shadow-sm */
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+.btn-secondary-style:hover {
+  opacity: 0.9;
 }

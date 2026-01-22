@@ -84,12 +84,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, language, onNavigate, activeVie
               <img 
                 src="https://raw.githubusercontent.com/conceptfac/SER_SCP_Dashboard/main/imgs/logo.svg" 
                 alt="Logo SCP" 
-                className="h-10 w-auto"
-                style={{ 
-                  display: 'block',
-                  maxWidth: '180px',
-                  filter: 'brightness(0) invert(1)' // Força a logo a ficar totalmente branca
-                }}
+                className="h-10 w-auto sidebar-logo"
                 onError={(e) => {
                   console.error("Erro ao carregar a logo do GitHub");
                   e.currentTarget.style.display = 'none';

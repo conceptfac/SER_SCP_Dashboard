@@ -201,7 +201,7 @@ const Clients: React.FC<ClientsProps> = ({ role, language }) => {
     <div className="space-y-6 md:space-y-8 animate-in fade-in duration-300 font-sans">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h2 className="text-xl md:text-2xl font-bold text-secondary font-display">{t.search} {t.clients}</h2>
-        <button onClick={() => handleOpenModal()} className="w-full sm:w-auto px-6 py-2.5 bg-buttons text-white rounded-xl font-bold hover:opacity-90 shadow-lg flex items-center justify-center gap-2 transition-all">
+        <button onClick={() => handleOpenModal()} className="w-full sm:w-auto flex items-center justify-center btn-primary-style">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"/></svg>
           {t.register}
         </button>
@@ -228,7 +228,7 @@ const Clients: React.FC<ClientsProps> = ({ role, language }) => {
           </div>
         )}
         <div className="flex items-end">
-           <button className="w-full bg-secondary text-white font-bold py-2 rounded-lg hover:opacity-90 transition-all shadow-sm">{t.search}</button>
+           <button className="w-full btn-secondary-style">{t.search}</button>
         </div>
       </div>
 

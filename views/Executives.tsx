@@ -1,20 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../supabaseClient';
 import { Executive, Language, UserRole } from '../types';
 import { TRANSLATIONS, BANKS, BRAZILIAN_STATES } from '../constants';
 import DatePicker from '../components/DatePicker';
+import BankAccountCard, { BankAccountCardData } from '../components/BankAccountCard';
+import AddBankModal, { NewBankData } from '../components/AddBankModal';
 
-interface BankAccount {
-  id: string;
-  bankCode: string;
-  bankName: string;
-  agency: string;
-  account: string;
-  digit: string;
-  type: string;
-  pixKey?: string;
-  pixType?: string;
-  isActive: boolean;
-}
 
 interface UploadedDocument {
   id: string;
@@ -30,33 +21,72 @@ interface ExecutivesProps {
   language: Language;
 }
 
+const MARITAL_STATUS_MAP: Record<string, number> = {
+  'Solteiro(a)': 1,
+  'Casado(a)': 2,
+  'Divorciado(a)': 3,
+  'Viúvo(a)': 4
+};
+
+const REVERSE_MARITAL_STATUS_MAP: Record<number, string> = {
+  1: 'Solteiro(a)',
+  2: 'Casado(a)',
+  3: 'Divorciado(a)',
+  4: 'Viúvo(a)'
+};
+
+const ROLE_MAP: Record<number, string> = {
+  0: 'HEAD',
+  1: 'Executivo Líder',
+  2: 'Executivo',
+  3: 'Financeiro'
+};
+
+const ACCOUNT_KIND_MAP: Record<number, string> = {
+  1: 'Corrente',
+  2: 'Poupança',
+  3: 'Conjunta'
+};
+
+const PIX_KEY_TYPE_MAP: Record<number, string> = {
+  1: 'CPF/CNPJ',
+  2: 'E-mail',
+  3: 'Celular',
+  4: 'Aleatória'
+};
+
 const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
   const t = TRANSLATIONS[language];
   const [showModal, setShowModal] = useState(false);
   const [showAddBankModal, setShowAddBankModal] = useState(false);
   const [selectedExec, setSelectedExec] = useState<Executive | null>(null);
+  const [isPF, setIsPF] = useState(true);
   const [cepError, setCepError] = useState(false);
   const [docError, setDocError] = useState(false);
   const [cnpjError, setCnpjError] = useState(false);
   const [isSearchingCep, setIsSearchingCep] = useState(false);
   
+  const [executivesList, setExecutivesList] = useState<Executive[]>([]);
+  const [searchName, setSearchName] = useState('');
+  const [searchDocument, setSearchDocument] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  
   const TABS = [t.general, t.address, t.bankData, t.documents];
   const [activeTabIndex, setActiveTabIndex] = useState(0);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, boolean>>({});
   
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([
-    { id: '1', bankCode: '341', bankName: 'Itaú Unibanco S.A.', agency: '0102', account: '12345', digit: '6', type: 'Corrente', isActive: true, pixKey: 'exec@pix.com', pixType: 'E-mail' },
-    { id: '2', bankCode: '001', bankName: 'Banco do Brasil S.A.', agency: '4321', account: '98765', digit: 'X', type: 'Corrente', isActive: false },
-    { id: '3', bankCode: '260', bankName: 'Nu Pagamentos S.A. (Nubank)', agency: '0001', account: '665544', digit: '2', type: 'Corrente', isActive: false }
-  ]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccountCardData[]>([]);
 
   const [uploadedDocs, setUploadedDocs] = useState<UploadedDocument[]>([
     { id: '1', type: 'RG', category: 'Identidade', name: 'identidade_joao.pdf', date: '10/06/2024 09:00', status: 'Ativo' }
   ]);
 
   const [formData, setFormData] = useState({ 
-    name: '', document: '', email: '', birthDate: '', rg: '', phone: '',
+    name: '', document: '', email: '', birthDate: '', rg: '', phone: '', whatsapp: '',
+    birthPlace: '',
     cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', estado: '',
-    razaoSocial: '', cnpj: '', estadoCivil: ''
+    razaoSocial: '', cnpj: '', estadoCivil: '', tradeName: '', representativeName: '', jobTitle: '',
+    role: 2, leaderId: null as string | null, leaderName: ''
   });
 
   const validateCPF = (cpf: string) => {
@@ -102,9 +132,78 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
     return true;
   };
 
-  const executives: Executive[] = [
-    { id: '1', name: 'João Silva', document: '111.222.333-44', email: 'joao@ser.com', role: 'Executivo Leader' },
-  ];
+  const [leaderOptions, setLeaderOptions] = useState<{id: string, name: string}[]>([]);
+  const [showLeaderOptions, setShowLeaderOptions] = useState(false);
+  const [isSearchingLeader, setIsSearchingLeader] = useState(false);
+
+  const handleLeaderSearch = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const term = e.target.value;
+    setFormData(prev => ({ ...prev, leaderName: term, leaderId: null }));
+    
+    if (term.length < 2) {
+        setLeaderOptions([]);
+        setShowLeaderOptions(false);
+        return;
+    }
+
+    setIsSearchingLeader(true);
+    setShowLeaderOptions(true);
+    
+    try {
+        let query = supabase.from('executives').select('id, full_name').or('role.eq.0,role.eq.1').ilike('full_name', `%${term}%`).limit(5);
+        if (selectedExec) query = query.neq('id', selectedExec.id);
+
+        const { data } = await query;
+        if (data) setLeaderOptions(data.map((d: any) => ({ id: d.id.toString(), name: d.full_name })));
+    } catch (err) {
+        console.error(err);
+    } finally {
+        setIsSearchingLeader(false);
+    }
+  };
+
+  const selectLeader = (leader: {id: string, name: string}) => {
+      setFormData(prev => ({ ...prev, leaderId: leader.id, leaderName: leader.name }));
+      setShowLeaderOptions(false);
+  };
+
+  const fetchExecutives = async () => {
+    setIsLoading(true);
+    try {
+      let query = supabase.from('executives').select('*');
+
+      if (searchName) {
+        query = query.or(`full_name.ilike.%${searchName}%,company_name.ilike.%${searchName}%`);
+      }
+
+      const cleanDoc = searchDocument.replace(/[^a-zA-Z0-9]/g, '');
+      if (cleanDoc) {
+        query = query.or(`cpf.eq.${cleanDoc},cnpj.eq.${cleanDoc},rg.ilike.%${cleanDoc}%`);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      const mappedExecutives: Executive[] = (data || []).map((item: any) => ({
+        id: item.id.toString(),
+        name: item.full_name || item.company_name || 'Sem Nome',
+        document: item.cpf || item.cnpj || '',
+        email: item.email || '',
+        role: ROLE_MAP[item.role as number] || 'Não definido'
+      }));
+      
+      setExecutivesList(mappedExecutives);
+    } catch (error) {
+      console.error('Erro ao buscar executivos:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchExecutives();
+  }, []);
 
   const maskCPF = (v: string) => v.replace(/\D/g, '').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2').substring(0, 14);
   const maskCNPJ = (v: string) => v.replace(/\D/g, '').replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d)/, '$1-$2').substring(0, 18);
@@ -143,43 +242,328 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
     }
   };
 
-  const handleToggleBank = (id: string) => {
-    setBankAccounts(bankAccounts.map(acc => ({
-      ...acc,
-      isActive: acc.id === id
-    })));
+  const fetchBankAccounts = async () => {
+    if (!selectedExec) return;
+    try {
+      const { data, error } = await supabase
+        .from('bank_accounts')
+        .select('*')
+        .eq('executive_id', selectedExec.id);
+
+      if (error) throw error;
+
+      const mappedAccounts: BankAccountCardData[] = (data || []).map((item: any) => ({
+        id: item.id.toString(),
+        bankCode: item.bank_id,
+        bankName: item.bank_name,
+        agency: item.agency || '',
+        account: item.account || '',
+        digit: item.digit || '',
+        type: item.account_type === 1 ? (ACCOUNT_KIND_MAP[item.account_kind] || 'Conta') : 'Pix',
+        pixKey: item.pix_key,
+        pixType: item.pix_key_type ? PIX_KEY_TYPE_MAP[item.pix_key_type] : undefined,
+        isActive: item.is_primary,
+        isValid: item.is_valid
+      }));
+
+      setBankAccounts(mappedAccounts);
+    } catch (error) {
+      console.error('Erro ao buscar contas bancárias:', error);
+    }
   };
 
-  const handleOpenModal = (exec: Executive | null = null) => {
+  useEffect(() => {
+    if (showModal && activeTabIndex === 2) {
+      fetchBankAccounts();
+    }
+  }, [showModal, activeTabIndex, selectedExec]);
+
+  const handleToggleBank = async (id: string) => {
+    if (!selectedExec) return;
+
+    // Otimistic update
+    const updatedAccounts = bankAccounts.map(acc => ({
+      ...acc,
+      isActive: acc.id === id
+    }));
+    setBankAccounts(updatedAccounts);
+
+    try {
+      // Primeiro, desativa todas as contas deste executivo
+      await supabase
+        .from('bank_accounts')
+        .update({ is_primary: false })
+        .eq('executive_id', selectedExec.id);
+
+      // Depois, ativa a conta selecionada
+      await supabase
+        .from('bank_accounts')
+        .update({ is_primary: true })
+        .eq('id', id);
+      
+      // Recarrega para garantir consistência
+      fetchBankAccounts();
+    } catch (error) {
+      console.error('Erro ao atualizar conta principal:', error);
+      fetchBankAccounts(); // Reverte em caso de erro
+    }
+  };
+
+  const handleDeleteBank = async (account: BankAccountCardData) => {
+    if (!selectedExec) return;
+    
+    const confirmMessage = `Deseja mesmo remover a instituicao ${account.bankName} do cliente ${selectedExec.name}?`;
+    if (window.confirm(confirmMessage)) {
+      try {
+        const { error } = await supabase
+          .from('bank_accounts')
+          .delete()
+          .eq('id', account.id);
+        
+        if (error) throw error;
+        
+        fetchBankAccounts();
+      } catch (error) {
+        console.error('Erro ao excluir conta:', error);
+        alert('Erro ao excluir conta.');
+      }
+    }
+  };
+
+  const handleSaveBank = async (data: NewBankData) => {
+    if (!selectedExec) return;
+    setIsLoading(true);
+    try {
+      const bankName = BANKS.find(b => b.code === data.bankCode)?.name || '';
+      
+      // Salvar Conta Bancária (Tipo 1)
+      if (data.agency && data.account) {
+        const kindMap: Record<string, number> = { 'Corrente': 1, 'Poupança': 2, 'Conjunta': 3 };
+        const { error } = await supabase.from('bank_accounts').insert({
+          executive_id: selectedExec.id,
+          account_type: 1,
+          bank_id: data.bankCode,
+          bank_name: bankName,
+          agency: data.agency,
+          account: data.account,
+          digit: data.digit,
+          account_kind: kindMap[data.kind],
+          account_holder: selectedExec.name,
+          is_primary: bankAccounts.length === 0
+        });
+        if (error) throw error;
+      }
+
+      // Salvar Chave Pix (Tipo 2)
+      if (data.pixKey) {
+        const pixMap: Record<string, number> = { 'CPF/CNPJ': 1, 'E-mail': 2, 'Celular': 3, 'Aleatória': 4 };
+        const { error } = await supabase.from('bank_accounts').insert({
+          executive_id: selectedExec.id,
+          account_type: 2,
+          bank_id: data.bankCode,
+          bank_name: bankName,
+          pix_key_type: pixMap[data.pixType],
+          pix_key: data.pixKey,
+          is_primary: bankAccounts.length === 0 && !data.agency
+        });
+        if (error) throw error;
+      }
+
+      await fetchBankAccounts();
+      setShowAddBankModal(false);
+    } catch (error) {
+      console.error('Erro ao salvar banco:', error);
+      alert('Erro ao salvar dados bancários.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleOpenModal = async (exec: Executive | null = null) => {
     setSelectedExec(exec);
     setActiveTabIndex(0);
     setCepError(false);
     setDocError(false);
     setCnpjError(false);
+    setFieldErrors({});
+    
     if (exec) {
+      // Determina se é PF ou PJ baseado no tamanho do documento (heurística inicial)
+      const cleanDoc = exec.document.replace(/\D/g, '');
+      setIsPF(cleanDoc.length <= 11);
+
+      // Preenchimento inicial com dados da lista
       setFormData({
-        ...formData, 
-        name: exec.name, 
-        document: exec.document, 
+        name: exec.name,
+        document: exec.document,
         email: exec.email,
+        birthDate: '', rg: '', phone: '', whatsapp: '', birthPlace: '', role: 2, leaderId: null, leaderName: '',
         cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', estado: '',
-        estadoCivil: ''
+        razaoSocial: '', cnpj: '', estadoCivil: '', tradeName: '', representativeName: '', jobTitle: ''
       });
+
+      // Buscar dados completos do executivo
+      const { data, error } = await supabase.from('executives').select('*').eq('id', exec.id).single();
+      
+      if (data && !error) {
+        // Determina se é PF ou PJ com prioridade para customer_type
+        if (data.customer_type === 'PJ') {
+          setIsPF(false);
+        } else if (data.customer_type === 'PF') {
+          setIsPF(true);
+        } else {
+          setIsPF(!!data.cpf);
+        }
+
+        let fetchedLeaderName = '';
+        if (data.leader_id) {
+            const { data: leaderData } = await supabase.from('executives').select('full_name').eq('id', data.leader_id).single();
+            if (leaderData) fetchedLeaderName = leaderData.full_name;
+        }
+
+        setFormData(prev => ({
+          ...prev,
+          name: data.full_name || '',
+          document: data.cpf ? maskCPF(data.cpf) : '',
+          email: data.email || '',
+          birthDate: data.birth_date || '',
+          rg: data.rg || '',
+          phone: data.phone || '',
+          whatsapp: data.whatsapp || '',
+          birthPlace: data.birth_place || '',
+          cep: data.postal_code ? maskCEP(data.postal_code) : '',
+          logradouro: data.street || '',
+          numero: data.address_number || '',
+          complemento: data.complement || '',
+          bairro: data.neighborhood || '',
+          cidade: data.city || '',
+          estado: data.state ? (BRAZILIAN_STATES[data.state - 1]?.value || '') : '',
+          razaoSocial: data.company_name || '',
+          cnpj: data.cnpj ? maskCNPJ(data.cnpj) : '',
+          estadoCivil: data.marital_status ? REVERSE_MARITAL_STATUS_MAP[data.marital_status] : '',
+          tradeName: data.trade_name || '',
+          representativeName: data.representative_name || '',
+          jobTitle: data.job_title || '',
+          role: data.role ?? 2,
+          leaderId: data.leader_id,
+          leaderName: fetchedLeaderName
+        }));
+      }
     } else {
+      setIsPF(true);
       setFormData({
-        name: '', document: '', email: '', birthDate: '', rg: '', phone: '',
+        name: '', document: '', email: '', birthDate: '', rg: '', phone: '', whatsapp: '', birthPlace: '', role: 2, leaderId: null, leaderName: '',
         cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', estado: '',
-        razaoSocial: '', cnpj: '', estadoCivil: ''
+        razaoSocial: '', cnpj: '', estadoCivil: '', tradeName: '', representativeName: '', jobTitle: ''
       });
     }
     setShowModal(true);
+  };
+
+  const getInputClass = (fieldName: string, errorState: boolean = false) => {
+    const hasError = fieldErrors[fieldName] || errorState;
+    return `w-full px-4 py-2.5 bg-gray-50 border rounded-xl outline-none shadow-inner transition-all text-secondary ${
+      hasError ? 'border-red-500 focus:ring-red-200' : 'border-gray-100 focus:ring-secondary/20'
+    }`;
+  };
+
+  const handleSave = async () => {
+    try {
+      setIsLoading(true);
+      
+      const stateId = BRAZILIAN_STATES.findIndex(s => s.value === formData.estado) + 1;
+      const maritalStatusId = MARITAL_STATUS_MAP[formData.estadoCivil] || null;
+      
+      // Validação de campos obrigatórios
+      const requiredFields = isPF 
+        ? ['name', 'document', 'email', 'birthDate', 'phone', 'cep', 'logradouro', 'numero', 'bairro', 'cidade', 'estado']
+        : ['razaoSocial', 'cnpj', 'email', 'phone', 'cep', 'logradouro', 'numero', 'bairro', 'cidade', 'estado'];
+
+      const newErrors: Record<string, boolean> = {};
+      let hasError = false;
+
+      requiredFields.forEach(field => {
+        if (!formData[field as keyof typeof formData]) {
+          newErrors[field] = true;
+          hasError = true;
+        }
+      });
+
+      if (docError || cnpjError || cepError) hasError = true;
+
+      setFieldErrors(newErrors);
+
+      if (hasError) {
+        alert('Erro ao salvar executivo. Verifique os dados.');
+        setIsLoading(false);
+        return;
+      }
+
+      const payload = {
+        customer_type: isPF ? 'PF' : 'PJ',
+        full_name: formData.name,
+        cpf: isPF ? (formData.document.replace(/\D/g, '') || null) : null,
+        email: formData.email,
+        birth_date: formData.birthDate || null,
+        rg: formData.rg,
+        phone: formData.phone || null,
+        whatsapp: formData.whatsapp || null,
+        birth_place: formData.birthPlace,
+        postal_code: formData.cep.replace(/\D/g, '') || null,
+        street: formData.logradouro,
+        address_number: formData.numero,
+        complement: formData.complemento,
+        neighborhood: formData.bairro,
+        city: formData.cidade,
+        state: stateId > 0 ? stateId : null,
+        company_name: formData.razaoSocial,
+        cnpj: !isPF ? (formData.cnpj.replace(/\D/g, '') || null) : null,
+        marital_status: maritalStatusId,
+        trade_name: formData.tradeName,
+        representative_name: formData.representativeName,
+        job_title: formData.jobTitle,
+        role: formData.role,
+        leader_id: formData.role === 2 ? (formData.leaderId || null) : null
+      };
+
+      let error;
+      if (selectedExec) {
+        const { error: updateError } = await supabase
+          .from('executives')
+          .update(payload)
+          .eq('id', selectedExec.id);
+        error = updateError;
+      } else {
+        const { error: insertError } = await supabase
+          .from('executives')
+          .insert([payload]);
+        error = insertError;
+      }
+
+      if (error) {
+        // Tratamento específico para o erro de constraint que você encontrou
+        if (error.code === '23514' && error.message.includes('executives_customer_type_check')) {
+           alert('ERRO DE BANCO DE DADOS: É necessário rodar o script SQL para permitir cadastro de PF. Veja o arquivo "migration_fix_customer_type.sql".');
+           return; // Interrompe aqui para não cair no catch e mostrar o erro genérico
+        }
+        throw error;
+      }
+
+      await fetchExecutives();
+      setShowModal(false);
+    } catch (error) {
+      console.error('Erro ao salvar executivo:', error);
+      alert('Erro ao salvar executivo. Verifique os dados.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300 font-sans">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h2 className="text-xl md:text-2xl font-bold text-secondary font-display">{t.executives}</h2>
-        <button onClick={() => handleOpenModal()} className="w-full sm:w-auto px-6 py-2.5 bg-buttons text-white rounded-xl font-bold hover:opacity-90 shadow-lg flex items-center justify-center gap-2 transition-all">
+        <button onClick={() => handleOpenModal()} className="w-full sm:w-auto flex items-center justify-center btn-primary-style">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"/></svg>
           {t.register}
         </button>
@@ -188,19 +572,26 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
       <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div>
           <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">{t.name}</label>
-          <input type="text" className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none text-sm text-secondary" placeholder={t.placeholderSearch} />
+          <input 
+            type="text" 
+            className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none text-sm text-secondary" 
+            placeholder={t.placeholderSearch} 
+            value={searchName}
+            onChange={(e) => setSearchName(e.target.value)}
+          />
         </div>
         <div>
           <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">{t.document}</label>
           <input 
             type="text" 
             className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none text-sm text-secondary" 
-            placeholder="000.000.000-00" 
-            onChange={(e) => { e.target.value = maskCPF(e.target.value) }}
+            placeholder="CPF, CNPJ ou RG" 
+            value={searchDocument}
+            onChange={(e) => setSearchDocument(e.target.value)}
           />
         </div>
         <div className="flex items-end">
-           <button className="w-full bg-secondary text-white font-bold py-2 rounded-lg hover:opacity-90 transition-all shadow-sm">{t.search}</button>
+           <button onClick={fetchExecutives} className="w-full btn-secondary-style">{isLoading ? '...' : t.search}</button>
         </div>
       </div>
 
@@ -215,7 +606,7 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {executives.map(exec => (
+              {executivesList.map(exec => (
                 <tr key={exec.id} className="hover:bg-gray-50/50 transition-colors group">
                   <td className="px-6 py-4 text-secondary font-normal">{exec.name}</td>
                   <td className="px-6 py-4 text-xs font-bold text-primary uppercase tracking-widest font-normal">{exec.role}</td>
@@ -254,122 +645,243 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
 
               <div className="min-h-[400px]">
                 {activeTabIndex === 0 && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-left-2 duration-300">
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nome Completo (*)</label>
-                        <input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner text-secondary" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
-                      </div>
-                      <DatePicker label="Nascimento (*)" value={formData.birthDate} onChange={(d) => setFormData({...formData, birthDate: d})} language={language} />
+                  <div className="animate-in fade-in slide-in-from-left-2 duration-300">
+                    <div className="flex p-1 bg-gray-100 rounded-xl mb-6 w-full sm:w-fit">
+                      <button onClick={() => { setIsPF(true); setCnpjError(false); }} className={`flex-1 sm:flex-none px-6 py-2 rounded-lg text-sm font-bold transition-all ${isPF ? 'bg-white text-primary shadow-sm' : 'text-gray-400'}`}>
+                        {t.pf}
+                      </button>
+                      <button onClick={() => { setIsPF(false); setDocError(false); }} className={`flex-1 sm:flex-none px-6 py-2 rounded-lg text-sm font-bold transition-all ${!isPF ? 'bg-white text-primary shadow-sm' : 'text-gray-400'}`}>
+                        {t.pj}
+                      </button>
                     </div>
-                    <div className="space-y-4">
-                      <div>
-                        <label className={`block text-[10px] font-bold uppercase mb-1 ${docError ? 'text-red-500' : 'text-gray-400'}`}>CPF (*)</label>
-                        <input 
-                          type="text" 
-                          className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl outline-none shadow-inner transition-all text-secondary ${docError ? 'border-red-500 focus:ring-red-200' : 'border-gray-100 focus:ring-secondary/20'}`} 
-                          value={formData.document} 
-                          onChange={(e) => {
-                            const raw = e.target.value.replace(/\D/g, '');
-                            const val = maskCPF(e.target.value);
-                            setFormData({...formData, document: val});
-                            if (raw.length === 11) setDocError(!validateCPF(raw));
-                            else setDocError(false);
-                          }} 
-                        />
-                        {docError && <p className="text-[10px] font-bold text-red-500 mt-1 uppercase tracking-tighter">Documento inválido</p>}
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Estado Civil</label>
-                        <select className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner text-sm font-bold text-secondary" value={formData.estadoCivil} onChange={(e) => setFormData({...formData, estadoCivil: e.target.value})}>
-                          <option value="">Selecione...</option>
-                          <option>Solteiro(a)</option>
-                          <option>Casado(a)</option>
-                          <option>Divorciado(a)</option>
-                          <option>Viúvo(a)</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">RG</label>
-                        <input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner text-secondary" value={formData.rg} onChange={(e) => setFormData({...formData, rg: e.target.value})} />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">E-mail (*)</label>
-                        <input type="email" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner text-secondary" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
-                      </div>
-                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {isPF ? (
+                      <>
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nome Completo (*)</label>
+                            <input type="text" className={getInputClass('name')} value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
+                          </div>
+                          <DatePicker label="Nascimento (*)" value={formData.birthDate} onChange={(d) => setFormData({...formData, birthDate: d})} language={language} />
+                        </div>
+                        <div className="space-y-4">
+                          <div>
+                            <label className={`block text-[10px] font-bold uppercase mb-1 ${docError ? 'text-red-500' : 'text-gray-400'}`}>CPF (*)</label>
+                            <input 
+                              type="text" 
+                              className={getInputClass('document', docError)}
+                              value={formData.document} 
+                              onChange={(e) => {
+                                const raw = e.target.value.replace(/\D/g, '');
+                                const val = maskCPF(e.target.value);
+                                setFormData({...formData, document: val});
+                                if (raw.length === 11) setDocError(!validateCPF(raw));
+                                else setDocError(false);
+                              }} 
+                            />
+                            {docError && <p className="text-[10px] font-bold text-red-500 mt-1 uppercase tracking-tighter">Documento inválido</p>}
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Estado Civil</label>
+                            <select className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner text-sm font-bold text-secondary" value={formData.estadoCivil} onChange={(e) => setFormData({...formData, estadoCivil: e.target.value})}>
+                              <option value="">Selecione...</option>
+                              <option>Solteiro(a)</option>
+                              <option>Casado(a)</option>
+                              <option>Divorciado(a)</option>
+                              <option>Viúvo(a)</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nível de Acesso (*)</label>
+                            <select className={getInputClass('role')} value={formData.role} onChange={(e) => setFormData({...formData, role: parseInt(e.target.value)})}>
+                              {Object.entries(ROLE_MAP).map(([key, value]) => (
+                                <option key={key} value={key}>{value}</option>
+                              ))}
+                            </select>
+                          </div>
+                          {formData.role === 2 && (
+                            <div className="relative">
+                              <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Líder Responsável</label>
+                              <input type="text" className={getInputClass('leaderName')} value={formData.leaderName} onChange={handleLeaderSearch} placeholder="Busque por nome..." />
+                              {showLeaderOptions && leaderOptions.length > 0 && (
+                                <div className="absolute top-full left-0 w-full bg-white border border-gray-100 rounded-xl shadow-xl mt-1 z-10 max-h-40 overflow-y-auto">
+                                  {leaderOptions.map(leader => (
+                                    <div key={leader.id} className="px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm text-secondary" onClick={() => selectLeader(leader)}>
+                                      {leader.name}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {isSearchingLeader && <span className="absolute right-3 top-8 text-xs text-gray-400">...</span>}
+                            </div>
+                          )}
+                        </div>
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">RG</label>
+                            <input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner text-secondary" value={formData.rg} onChange={(e) => setFormData({...formData, rg: e.target.value})} />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Naturalidade</label>
+                            <input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner text-secondary" value={formData.birthPlace} onChange={(e) => setFormData({...formData, birthPlace: e.target.value})} />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">E-mail (*)</label>
+                            <input type="email" className={getInputClass('email')} value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Telefone (*)</label>
+                              <input type="text" className={getInputClass('phone')} value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">WhatsApp</label>
+                              <input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner text-secondary" value={formData.whatsapp} onChange={(e) => setFormData({...formData, whatsapp: e.target.value})} />
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Razão Social (*)</label>
+                            <input type="text" className={getInputClass('razaoSocial')} value={formData.razaoSocial} onChange={(e) => setFormData({...formData, razaoSocial: e.target.value})} />
+                          </div>
+                          <div>
+                            <label className={`block text-[10px] font-bold uppercase mb-1 ${cnpjError ? 'text-red-500' : 'text-gray-400'}`}>CNPJ (*)</label>
+                            <input type="text" className={getInputClass('cnpj', cnpjError)} value={formData.cnpj} onChange={(e) => {
+                              const raw = e.target.value.replace(/\D/g, '');
+                              const val = maskCNPJ(e.target.value);
+                              setFormData({...formData, cnpj: val});
+                              if (raw.length === 14) {
+                                setCnpjError(!validateCNPJ(raw));
+                              } else {
+                                setCnpjError(false);
+                              }
+                            }} />
+                            {cnpjError && <p className="text-[10px] font-bold text-red-500 mt-1 uppercase tracking-tighter">Documento inválido</p>}
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nome Fantasia</label>
+                            <input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner text-secondary" value={formData.tradeName} onChange={(e) => setFormData({...formData, tradeName: e.target.value})} />
+                          </div>
+                        </div>
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nome do Representante</label>
+                            <input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner text-secondary" value={formData.representativeName} onChange={(e) => setFormData({...formData, representativeName: e.target.value})} />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cargo do Representante</label>
+                            <input type="text" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner text-secondary" value={formData.jobTitle} onChange={(e) => setFormData({...formData, jobTitle: e.target.value})} />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">E-mail (*)</label>
+                            <input type="email" className={getInputClass('email')} value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Telefone (*)</label>
+                            <input type="text" className={getInputClass('phone')} value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} />
+                          </div>
+                        </div>
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nível de Acesso (*)</label>
+                            <select className={getInputClass('role')} value={formData.role} onChange={(e) => setFormData({...formData, role: parseInt(e.target.value)})}>
+                              {Object.entries(ROLE_MAP).map(([key, value]) => (
+                                <option key={key} value={key}>{value}</option>
+                              ))}
+                            </select>
+                          </div>
+                          {formData.role === 2 && (
+                            <div className="relative">
+                              <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Líder Responsável</label>
+                              <input type="text" className={getInputClass('leaderName')} value={formData.leaderName} onChange={handleLeaderSearch} placeholder="Busque por nome..." />
+                              {showLeaderOptions && leaderOptions.length > 0 && (
+                                <div className="absolute top-full left-0 w-full bg-white border border-gray-100 rounded-xl shadow-xl mt-1 z-10 max-h-40 overflow-y-auto">
+                                  {leaderOptions.map(leader => (
+                                    <div key={leader.id} className="px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm text-secondary" onClick={() => selectLeader(leader)}>
+                                      {leader.name}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
                   </div>
                 )}
 
                 {activeTabIndex === 1 && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-left-2 duration-300">
-                    <div className="space-y-4">
-                      <div>
+                  <div className="grid grid-cols-12 gap-6 animate-in fade-in slide-in-from-left-2 duration-300">
+                      <div className="col-span-12 md:col-span-3">
                         <label className={`block text-[10px] font-bold uppercase mb-1 ${cepError ? 'text-red-500' : 'text-gray-400'}`}>
                           CEP {isSearchingCep && <span className="animate-pulse ml-1 text-primary lowercase">(buscando...)</span>}
                         </label>
                         <input 
                           type="text" 
-                          className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl outline-none shadow-inner transition-all text-secondary ${cepError ? 'border-red-500' : 'border-gray-100 focus:border-secondary/30'}`} 
+                          className={getInputClass('cep', cepError)}
                           value={formData.cep}
                           onChange={handleCEPChange}
                           placeholder="00000-000"
                         />
                         {cepError && <p className="text-[10px] font-bold text-red-500 mt-1 uppercase tracking-tighter">CEP inválido</p>}
                       </div>
-                      <div>
+                      <div className="col-span-12 md:col-span-9">
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Logradouro (*)</label>
                         <input 
                           type="text" 
-                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner text-secondary" 
+                          className={getInputClass('logradouro')}
                           value={formData.logradouro}
                           onChange={(e) => setFormData({...formData, logradouro: e.target.value})}
                         />
                       </div>
-                    </div>
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Razão Social (*)</label>
+
+                      <div className="col-span-12 md:col-span-2">
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Número</label>
+                        <input 
+                          type="text" 
+                          className={getInputClass('numero')}
+                          value={formData.numero}
+                          onChange={(e) => setFormData({...formData, numero: e.target.value})}
+                        />
+                      </div>
+                      <div className="col-span-12 md:col-span-4">
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Complemento</label>
                         <input 
                           type="text" 
                           className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner text-secondary" 
-                          value={formData.razaoSocial}
-                          onChange={(e) => setFormData({...formData, razaoSocial: e.target.value})}
+                          value={formData.complemento}
+                          onChange={(e) => setFormData({...formData, complemento: e.target.value})}
                         />
                       </div>
-                      <div>
-                        <label className={`block text-[10px] font-bold uppercase mb-1 ${cnpjError ? 'text-red-500' : 'text-gray-400'}`}>CNPJ (*)</label>
+                      <div className="col-span-12 md:col-span-6">
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Bairro</label>
                         <input 
                           type="text" 
-                          className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl outline-none shadow-inner transition-all text-secondary ${cnpjError ? 'border-red-500 focus:ring-red-200' : 'border-gray-100 focus:ring-secondary/20'}`} 
-                          value={formData.cnpj}
-                          onChange={(e) => {
-                            const raw = e.target.value.replace(/\D/g, '');
-                            const val = maskCNPJ(e.target.value);
-                            setFormData({...formData, cnpj: val});
-                            if (raw.length === 14) setCnpjError(!validateCNPJ(raw));
-                            else setCnpjError(false);
-                          }}
+                          className={getInputClass('bairro')}
+                          value={formData.bairro}
+                          onChange={(e) => setFormData({...formData, bairro: e.target.value})}
                         />
-                        {cnpjError && <p className="text-[10px] font-bold text-red-500 mt-1 uppercase tracking-tighter">Documento inválido</p>}
                       </div>
-                    </div>
-                    <div className="space-y-4">
-                      <div>
+
+                      <div className="col-span-12 md:col-span-6">
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cidade (*)</label>
                         <input 
                           type="text" 
-                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner text-secondary" 
+                          className={getInputClass('cidade')}
                           value={formData.cidade}
                           onChange={(e) => setFormData({...formData, cidade: e.target.value})}
                         />
                       </div>
-                      <div>
+                      <div className="col-span-12 md:col-span-6">
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Estado (*)</label>
                         <select 
-                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none shadow-inner text-sm font-bold text-secondary"
+                          className={getInputClass('estado')}
                           value={formData.estado}
                           onChange={(e) => setFormData({...formData, estado: e.target.value})}
                         >
@@ -379,7 +891,6 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
                           ))}
                         </select>
                       </div>
-                    </div>
                   </div>
                 )}
 
@@ -411,10 +922,15 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
                                 <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-all shadow-md ${acc.isActive ? 'left-6.5' : 'left-0.5'}`}></div>
                               </div>
                             </div>
-                            <button className="text-gray-300 hover:text-red-500 transition-colors p-2"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+                            <button onClick={() => handleDeleteBank(acc)} className="text-gray-300 hover:text-red-500 transition-colors p-2"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
                           </div>
                         </div>
                       ))}
+                      {bankAccounts.length === 0 && (
+                        <div className="text-center py-8 text-gray-400 text-sm font-bold uppercase tracking-widest">
+                          Nenhuma conta bancária encontrada
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -488,7 +1004,7 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
 
               <div className="mt-10 pt-6 border-t border-gray-100 flex justify-end gap-4">
                 <button onClick={() => setShowModal(false)} className="px-8 py-2.5 text-xs font-black text-bodyText hover:text-secondary uppercase tracking-widest transition-colors">{t.cancel}</button>
-                <button disabled={docError || cnpjError || cepError} className={`px-14 py-2.5 bg-buttons text-white rounded-[1.5rem] font-black shadow-2xl hover:opacity-95 transform transition-all hover:-translate-y-1 text-xs uppercase tracking-widest ${docError || cnpjError || cepError ? 'opacity-50 cursor-not-allowed grayscale' : ''}`}>{selectedExec ? t.save : t.register}</button>
+                <button onClick={handleSave} disabled={docError || cnpjError || cepError || isLoading} className={`px-14 py-2.5 bg-buttons text-white rounded-[1.5rem] font-black shadow-2xl hover:opacity-95 transform transition-all hover:-translate-y-1 text-xs uppercase tracking-widest ${docError || cnpjError || cepError || isLoading ? 'opacity-50 cursor-not-allowed grayscale' : ''}`}>{isLoading ? '...' : (selectedExec ? t.save : t.register)}</button>
               </div>
             </div>
           </div>
@@ -496,68 +1012,13 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language }) => {
       )}
 
       {showAddBankModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setShowAddBankModal(false)}></div>
-          <div className="relative bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden">
-            <div className="p-8 md:p-10">
-              <div className="flex items-center justify-between mb-8">
-                <h4 className="text-2xl font-bold text-secondary uppercase tracking-tighter font-display">Nova Entidade Financeira</h4>
-                <button onClick={() => setShowAddBankModal(false)} className="text-gray-400 hover:text-secondary transition-colors"><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
-              </div>
-
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 tracking-widest">Instituição Bancária (*)</label>
-                  <select className="w-full px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold text-secondary shadow-inner">
-                    {BANKS.map(bank => <option key={bank.code} value={bank.code}>{bank.code} - {bank.name}</option>)}
-                  </select>
-                </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 tracking-widest">Agência (*)</label>
-                    <input type="text" className="w-full px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner text-secondary" placeholder="0000" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 tracking-widest">Conta e Dígito (*)</label>
-                    <div className="flex gap-2">
-                      <input type="text" className="flex-1 px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner text-secondary" placeholder="000000" />
-                      <input type="text" maxLength={3} className="w-20 px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner text-center text-secondary" placeholder="D" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 tracking-widest">Tipo de Conta (*)</label>
-                    <select className="w-full px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner text-secondary">
-                      <option>Corrente</option><option>Poupança</option><option>Conjunta</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 tracking-widest">Titular da Conta (*)</label>
-                    <input type="text" className="w-full px-5 py-3 bg-gray-200 border border-gray-100 rounded-2xl outline-none text-sm font-bold cursor-not-allowed opacity-60 text-secondary" disabled value={selectedExec?.name || ''} />
-                  </div>
-                </div>
-
-                <div className="pt-6 border-t border-gray-50">
-                   <h5 className="text-[10px] font-bold text-secondary uppercase mb-4 tracking-widest flex items-center gap-2"><span className="w-2 h-2 bg-primary rounded-full"></span> Conectar Chave Pix (Opcional)</h5>
-                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                     <select className="px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner text-secondary">
-                       <option>CPF / CNPJ</option><option>E-mail</option><option>Celular</option><option>Chave Aleatória</option>
-                     </select>
-                     <input type="text" className="px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none text-sm font-bold shadow-inner text-secondary" placeholder="Insira a chave pix" />
-                   </div>
-                </div>
-              </div>
-
-              <div className="mt-10 flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
-                <button onClick={() => setShowAddBankModal(false)} className="px-8 py-3 text-xs font-black text-bodyText hover:text-secondary uppercase tracking-widest transition-colors">DESCARTAR</button>
-                <button onClick={() => setShowAddBankModal(false)} className="px-12 py-3 bg-secondary text-white rounded-2xl text-xs font-black shadow-2xl hover:opacity-95 uppercase tracking-widest transition-all">CONCLUIR ADIÇÃO</button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <AddBankModal
+          isOpen={showAddBankModal}
+          onClose={() => setShowAddBankModal(false)}
+          onSave={handleSaveBank}
+          holderName={selectedExec?.name || ''}
+          isLoading={isLoading}
+        />
       )}
     </div>
   );
