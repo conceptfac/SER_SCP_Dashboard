@@ -23,13 +23,14 @@ import { calculateOnboardingState, OnboardingState } from '../utils/onboardingWo
 interface RegisterModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (data?: { id: string, isNew: boolean }) => void;
   initialData?: any;
   entityType: 'executive' | 'client';
   language: Language;
   userRole?: UserRole;
   currentUserId?: string;
   currentUserName?: string;
+  initialTab?: number;
 }
 
 // Mapas auxiliares para lógica interna
@@ -38,7 +39,7 @@ const REVERSE_MARITAL_STATUS_MAP: Record<number, string> = { 1: 'Solteiro(a)', 2
 const ACCOUNT_KIND_MAP: Record<number, string> = { 1: 'Corrente', 2: 'Poupança', 3: 'Conjunta' };
 const PIX_KEY_TYPE_MAP: Record<number, string> = { 1: 'CPF/CNPJ', 2: 'E-mail', 3: 'Celular', 4: 'Aleatória' };
 
-const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onSuccess, initialData, entityType, language, userRole, currentUserId, currentUserName }) => {
+const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onSuccess, initialData, entityType, language, userRole, currentUserId, currentUserName, initialTab }) => {
   const t = TRANSLATIONS[language];
   const TABS = [t.general, t.address, t.bankData, t.documents];
   if (entityType === 'client') TABS.push(t.statusFlow || 'Status');
@@ -168,8 +169,37 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onSucces
     }
   }, [formData, bankAccounts, uploadedDocs, currentEntityId, entityType]);
 
+  // Efeito para promover automaticamente para análise e notificar o HEAD
+  useEffect(() => {
+    const promoteToAnalysis = async () => {
+      if (!currentEntityId || entityType !== 'client' || !onboardingState?.isApt) return;
+      
+      // Verifica o estado real no banco para evitar loops ou atualizações desnecessárias
+      const { data: customer } = await supabase.from('customers').select('onboarding_step, executive_id').eq('id', currentEntityId).single();
+      
+      if (customer && customer.onboarding_step === 'aptitude') {
+         // Atualiza para análise
+         await supabase.from('customers').update({ onboarding_step: 'analysis' }).eq('id', currentEntityId);
+         
+         // Envia notificação
+         const execName = currentUserName || 'Executivo'; // Simplificação: assume que quem está editando é o executivo ou usa o nome da sessão
+         
+         await supabase.from('notifications').insert({
+             type: 'new_registration_analysis',
+             target_role: 0, // HEAD
+             title: 'Novo Cadastro em Análise',
+             message: JSON.stringify({ executive: execName, client: formData.name }),
+             related_entity_id: currentEntityId,
+             status: 'unread'
+         });
+      }
+    };
+
+    promoteToAnalysis();
+  }, [onboardingState?.isApt, currentEntityId, entityType]);
+
   const loadData = async () => {
-    setActiveTabIndex(0);
+    setActiveTabIndex(initialTab ?? 0);
     setCepError(false);
     setDocError(false);
     setAgeError(false);
@@ -401,7 +431,7 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onSucces
         return {
           id: doc.id.toString(), type: DOC_TYPE_MAP[doc.type] || doc.type.toString(), category: DOC_CATEGORY_MAP[doc.category] || 'Outros',
           name: doc.file_url ? doc.file_url.split('/').pop() : 'Documento', date: new Date(doc.created_at).toLocaleString('pt-BR'),
-          status: DOC_STATUS_MAP[doc.status] || 'Pendente', url: signedData?.signedUrl || '#', filePath: doc.file_url
+          status: DOC_STATUS_MAP[doc.status] || 'Pendente', statusId: doc.status, url: signedData?.signedUrl || '#', filePath: doc.file_url
         };
       }));
       setUploadedDocs(mappedDocs);
@@ -422,13 +452,40 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onSucces
       if (error) throw new Error(error.message);
 
       const typeId = DOC_VALUE_TO_ID[selectedDocType] || 1;
-      const categoryId = typeId === 6 ? 3 : 1; 
+      let categoryId = 1;
+      if (typeId === 6) categoryId = 3; // Residência
+      if (typeId === 7) categoryId = 2; // Contrato
+      
       const ownerType = entityType === 'client' ? 1 : 2;
 
       const { error: dbError } = await supabase.from('documents').insert({
         category: categoryId, type: typeId, file_url: filePath, status: 1, owner_id: currentEntityId, owner_type: ownerType, is_valid: true
       });
       if (dbError) throw dbError;
+
+      if (typeId === 7 && entityType === 'client') {
+        const execName = currentUserName || 'Executivo';
+        
+        // Resetar status para pendente e limpar motivo de rejeição para permitir nova aprovação
+        await supabase.from('customers').update({ 
+            registration_status: 'pending',
+            registration_rejection_reason: null
+        }).eq('id', currentEntityId);
+
+        await supabase.from('notifications').insert({
+           type: 'new_registration_analysis',
+           target_role: 0, // HEAD
+           title: 'Contrato Enviado',
+           message: JSON.stringify({ 
+               executive: execName, 
+               client: formData.name,
+               subtype: 'contract_upload'
+           }),
+           related_entity_id: currentEntityId,
+           status: 'unread'
+       });
+      }
+
       await fetchDocuments();
     } catch (error: any) { alert(`Erro ao enviar arquivo: ${error.message}`); } finally { setIsLoading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
   };
@@ -445,12 +502,24 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onSucces
     }
   };
 
-  useEffect(() => {
-    if (isOpen) {
-      if (activeTabIndex === 2) fetchBankAccounts();
-      if (activeTabIndex === 3) fetchDocuments();
+  const handleDocumentStatusChange = async (doc: UploadedDocument, newStatus: number) => {
+    if (isReadOnly || !currentEntityId) return;
+    try {
+        const { error } = await supabase.from('documents').update({ status: newStatus }).eq('id', doc.id);
+        if (error) throw error;
+        await fetchDocuments();
+    } catch (error) {
+        console.error(error);
+        alert('Erro ao atualizar status do documento.');
     }
-  }, [isOpen, activeTabIndex, initialData]);
+  };
+
+  useEffect(() => {
+    if (isOpen && currentEntityId) {
+      fetchBankAccounts();
+      fetchDocuments();
+    }
+  }, [isOpen, currentEntityId]);
 
   const handleToggleBank = async (id: string) => {
     if (isReadOnly || !currentEntityId) return;
@@ -484,11 +553,18 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onSucces
     if (isReadOnly || !currentEntityId) return;
     setIsLoading(true);
     try {
-      const bankName = BANKS.find(b => b.code === data.bankCode)?.name || '';
+      let bankName = BANKS.find(b => b.code === data.bankCode)?.name || '';
+      let bankId = data.bankCode;
       const idField = entityType === 'executive' ? 'executive_id' : 'customer_id';
+
+      if (data.accountType === 'PIX') {
+        bankName = 'Chave Pix';
+        bankId = '000';
+      }
+
       const payload: any = {
         [idField]: currentEntityId, account_type: data.accountType === 'BANK' ? 1 : 2,
-        bank_id: data.bankCode, bank_name: bankName, is_primary: editingAccount ? editingAccount.isActive : bankAccounts.length === 0
+        bank_id: bankId, bank_name: bankName, is_primary: editingAccount ? editingAccount.isActive : bankAccounts.length === 0
       };
 
       if (data.accountType === 'BANK') {
@@ -508,23 +584,122 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onSucces
     } catch (error) { alert('Erro ao salvar dados bancários.'); } finally { setIsLoading(false); }
   };
 
-  const handleOnboardingAction = async (step: 'analysis' | 'registration', action: 'approve' | 'reject', reason?: string) => {
+  const handleOnboardingAction = async (step: 'aptitude' | 'analysis' | 'registration', action: 'approve' | 'reject' | 'submit', reason?: string) => {
     if (!currentEntityId) return;
+
+    // Validação rigorosa para aprovação da análise pelo HEAD
+    if (step === 'analysis' && action === 'approve') {
+      // 1. Validar Campos do Formulário (Mesma lógica do handleSave)
+      const requiredFields = isPF 
+        ? ['name', 'document', 'email', 'birthDate', 'phone', 'cep', 'logradouro', 'numero', 'bairro', 'cidade', 'estado']
+        : ['razaoSocial', 'cnpj', 'representativeName', 'email', 'phone', 'cep', 'logradouro', 'numero', 'bairro', 'cidade', 'estado'];
+
+      const newErrors: Record<string, boolean> = {};
+      let hasError = false;
+      requiredFields.forEach(field => { if (!formData[field as keyof typeof formData]) { newErrors[field] = true; hasError = true; } });
+      
+      if (docError || cnpjError || cepError || ageError || Object.keys(duplicateErrors).length > 0) hasError = true;
+
+      if (hasError) {
+        setFieldErrors(newErrors);
+        alert('Não é possível aprovar: Existem pendências ou campos inválidos no formulário de cadastro.');
+        return;
+      }
+
+      // 2. Validar Banco Ativo
+      const hasActiveBank = bankAccounts.some(acc => acc.isActive && acc.isValid);
+      if (!hasActiveBank) {
+        alert('Não é possível aprovar: O cliente deve possuir pelo menos uma conta bancária ativa e válida.');
+        return;
+      }
+
+      // 3. Validar Documentos Aceitos (Identidade e Residência)
+      const hasApprovedIdentity = uploadedDocs.some(doc => (['RG', 'CPF', 'CNH', 'CIN', 'Passaporte'].includes(doc.type) || doc.category === 'Identidade') && doc.status === 'Ativo');
+      const hasApprovedResidence = uploadedDocs.some(doc => (doc.type === 'Comprovante de Residência' || doc.category === 'Residência') && doc.status === 'Ativo');
+
+      if (!hasApprovedIdentity || !hasApprovedResidence) {
+        alert('Não é possibile aprovar: É necessário ter pelo menos um documento de Identidade e um de Residência com status "Ativo" (Aceito).');
+        return;
+      }
+    }
+
+    // Validação para aprovação final (Registration)
+    if (step === 'registration' && action === 'approve') {
+        const hasApprovedContract = uploadedDocs.some(doc => 
+            (doc.type === 'Contrato' || doc.category === 'Contrato') && 
+            doc.status === 'Ativo'
+        );
+
+        if (!hasApprovedContract) {
+            alert('Não é possível aprovar: É necessário ter pelo menos um Contrato Assinado com status "Ativo" (Aprovado).');
+            return;
+        }
+    }
+
     setIsLoading(true);
     try {
       const updates: any = {};
-      if (step === 'analysis') {
+      if (step === 'aptitude' && action === 'submit') {
+        updates.onboarding_step = 'analysis';
+        updates.analysis_status = 'pending';
+        updates.account_status = 'pending';
+
+        // Enviar notificação para o HEAD (Reenvio ou Envio Manual)
+        const execName = currentUserName || 'Executivo';
+        await supabase.from('notifications').insert({
+             type: 'new_registration_analysis',
+             target_role: 0, // HEAD
+             title: 'Cadastro Enviado para Análise',
+             message: JSON.stringify({ executive: execName, client: formData.name }),
+             related_entity_id: currentEntityId,
+             status: 'unread'
+         });
+      } else if (step === 'analysis') {
         updates.analysis_status = action === 'approve' ? 'approved' : 'rejected';
         updates.analysis_rejection_reason = reason || null;
-        if (action === 'approve') updates.onboarding_step = 'password';
+        if (action === 'approve') {
+          updates.onboarding_step = 'password';
+          updates.account_status = 'pending';
+        } else {
+          updates.account_status = 'denied';
+        }
       } else if (step === 'registration') {
         updates.registration_status = action === 'approve' ? 'approved' : 'rejected';
         updates.registration_rejection_reason = reason || null;
-        if (action === 'approve') updates.onboarding_step = 'completed';
+        if (action === 'approve') {
+          updates.onboarding_step = 'completed';
+          updates.account_status = 'active';
+        } else {
+          updates.account_status = 'denied';
+        }
       }
       await supabase.from('customers').update(updates).eq('id', currentEntityId);
+      if (updates.account_status) setCurrentStatus(updates.account_status);
       const { data } = await supabase.from('customers').select('*').eq('id', currentEntityId).single();
       if (data) setOnboardingState(calculateOnboardingState(formData, bankAccounts, uploadedDocs, data));
+
+      // Se for etapa de análise OU registro, resolver notificação e fechar modal
+      if ((step === 'analysis' || step === 'registration') && (action === 'approve' || action === 'reject')) {
+          const notifStatus = action === 'approve' ? 'accepted' : 'denied';
+          
+          // Buscar notificações pendentes deste tipo para este cliente
+          const { data: notifications } = await supabase
+              .from('notifications')
+              .select('id')
+              .eq('related_entity_id', currentEntityId)
+              .eq('type', 'new_registration_analysis')
+              .in('status', ['unread', 'read']);
+
+          if (notifications && notifications.length > 0) {
+              await supabase.from('notifications').update({ status: notifStatus }).in('id', notifications.map(n => n.id));
+          }
+          
+          alert(`${step === 'analysis' ? 'Análise' : 'Aprovação Final'} processada com sucesso.`);
+          onClose();
+          if (onSuccess) onSuccess();
+          return;
+      }
+
       alert('Status atualizado com sucesso!');
     } catch (error) { alert('Erro ao atualizar onboarding.'); } finally { setIsLoading(false); }
   };
@@ -569,12 +744,19 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onSucces
       }
 
       const table = entityType === 'executive' ? 'executives' : 'customers';
-      if (currentEntityId) await supabase.from(table).update(payload).eq('id', currentEntityId);
-      else {
+      let savedId = currentEntityId;
+      let isNew = !currentEntityId;
+
+      if (currentEntityId) {
+        await supabase.from(table).update(payload).eq('id', currentEntityId);
+      } else {
         const { data } = await supabase.from(table).insert([payload]).select('id').single();
-        if (data) setCurrentEntityId(data.id);
+        if (data) {
+          savedId = data.id;
+          setCurrentEntityId(data.id);
+        }
       }
-      onSuccess();
+      onSuccess({ id: savedId ? savedId.toString() : '', isNew });
     } catch (error: any) { alert('Erro ao salvar.'); } finally { setIsLoading(false); }
   };
 
@@ -588,6 +770,38 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onSucces
   const renderActionButtons = () => {
     if (!currentEntityId) return null;
     if (entityType === 'executive' && userRole !== UserRole.HEAD) return null;
+
+    // Cabeçalho de Análise para o HEAD
+    if (userRole === UserRole.HEAD && onboardingState?.step === 'analysis' && onboardingState?.analysisStatus !== 'rejected') {
+      return (
+        <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex items-center gap-4 shadow-sm animate-in fade-in slide-in-from-top-2 mr-4">
+            <div>
+                <p className="text-[10px] font-black text-blue-800 uppercase tracking-widest mb-1">Cadastro em Análise</p>
+                <p className="text-[10px] text-blue-600 font-medium leading-tight">Aprovar dados do cliente?</p>
+            </div>
+            <div className="flex gap-2">
+                <button onClick={() => handleOnboardingAction('analysis', 'approve')} className="px-4 py-2 bg-white text-green-600 text-[10px] font-black rounded-xl shadow-sm hover:bg-green-50 uppercase border border-green-100">Aceitar</button>
+                <button onClick={() => { const r = prompt('Motivo:'); if(r) handleOnboardingAction('analysis', 'reject', r); }} className="px-4 py-2 bg-white text-red-600 text-[10px] font-black rounded-xl shadow-sm hover:bg-red-50 uppercase border border-red-100">Negar</button>
+            </div>
+         </div>
+      );
+    }
+
+    // Cabeçalho de Aprovação Final para o HEAD
+    if (userRole === UserRole.HEAD && onboardingState?.step === 'registration' && onboardingState?.registrationStatus !== 'rejected' && onboardingState?.hasContractSigned) {
+      return (
+        <div className="bg-purple-50 border border-purple-100 rounded-2xl p-4 flex items-center gap-4 shadow-sm animate-in fade-in slide-in-from-top-2 mr-4">
+            <div>
+                <p className="text-[10px] font-black text-purple-800 uppercase tracking-widest mb-1">Aprovação Final</p>
+                <p className="text-[10px] text-purple-600 font-medium leading-tight">Aprovar contrato e cadastro?</p>
+            </div>
+            <div className="flex gap-2">
+                <button onClick={() => handleOnboardingAction('registration', 'approve')} className="px-4 py-2 bg-white text-green-600 text-[10px] font-black rounded-xl shadow-sm hover:bg-green-50 uppercase border border-green-100">Aceitar</button>
+                <button onClick={() => { const r = prompt('Motivo:'); if(r) handleOnboardingAction('registration', 'reject', r); }} className="px-4 py-2 bg-white text-red-600 text-[10px] font-black rounded-xl shadow-sm hover:bg-red-50 uppercase border border-red-100">Negar</button>
+            </div>
+         </div>
+      );
+    }
 
     if (currentStatus !== 'archiving' && currentStatus !== 'archived') {
       return (
@@ -686,11 +900,13 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onSucces
                 selectedDocType={selectedDocType}
                 setSelectedDocType={setSelectedDocType}
                 isReadOnly={isReadOnly}
+                onUpdateStatus={handleDocumentStatusChange}
                 onFileUpload={handleFileUpload}
                 onDeleteDocument={handleDeleteDocument}
                 userRole={userRole}
                 fileInputRef={fileInputRef}
                 acceptedExtensions={ACCEPTED_EXTENSIONS}
+                allowContractUpload={entityType === 'executive' || (onboardingState?.step === 'registration' || onboardingState?.step === 'completed')}
               />
             )}
 
@@ -701,6 +917,7 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onSucces
                 entityType={entityType}
                 userRole={userRole}
                 onAction={handleOnboardingAction}
+                onNavigateToTab={setActiveTabIndex}
               />
             )}
           </div>

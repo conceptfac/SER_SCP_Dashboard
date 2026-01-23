@@ -8,7 +8,7 @@ export interface Notification {
   recipient_id?: string;
   target_role?: number;
   sender_id?: string;
-  type: 'archive_client' | 'archive_contract' | 'withdrawal_request' | 'scp_info' | 'generic';
+  type: 'archive_client' | 'archive_contract' | 'withdrawal_request' | 'scp_info' | 'generic' | 'new_registration_analysis';
   title: string;
   message: string;
   related_entity_id?: string;
@@ -150,7 +150,14 @@ const Notifications: React.FC<NotificationsProps> = ({ user, onNavigate, languag
       // Mapeia o tipo de notificação para a view correta
       switch (notification.type) {
         case 'archive_client':
-          onNavigate('clients', { openClientId: notification.related_entity_id, timestamp: Date.now() });
+        case 'new_registration_analysis':
+          let initialTab = 0;
+          try {
+             const data = JSON.parse(notification.message);
+             if (data.subtype === 'contract_upload') initialTab = 3;
+          } catch (e) {}
+          
+          onNavigate('clients', { openClientId: notification.related_entity_id, timestamp: Date.now(), initialTab });
           break;
         case 'archive_contract':
         case 'withdrawal_request':
@@ -179,6 +186,17 @@ const Notifications: React.FC<NotificationsProps> = ({ user, onNavigate, languag
                 .replace('{client}', clientName);
         } catch (e) {
             // Fallback caso a mensagem não seja um JSON válido (legado)
+            message = notification.message;
+        }
+    } else if (notification.type === 'new_registration_analysis') {
+        try {
+            const data = JSON.parse(notification.message);
+            if (data.subtype === 'contract_upload') {
+                message = `O executivo ${data.executive} enviou um contrato para análise.`;
+            } else {
+                message = `O executivo ${data.executive} enviou um novo cadastro para análise.`;
+            }
+        } catch (e) {
             message = notification.message;
         }
     } else if (notification.type === 'archive_contract') {

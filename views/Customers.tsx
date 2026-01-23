@@ -41,11 +41,14 @@ const Customers: React.FC<CustomersProps> = ({ role, language, userId, userName,
   const [selectedExecutive, setSelectedExecutive] = useState<any | null>(null);
   const [handledInitialId, setHandledInitialId] = useState<string | null>(null);
   const [handledTimestamp, setHandledTimestamp] = useState<number>(0);
+  const [pendingOpenId, setPendingOpenId] = useState<string | null>(null);
+  const [modalTab, setModalTab] = useState(0);
 
   // Search states
   const [searchName, setSearchName] = useState('');
   const [searchDocument, setSearchDocument] = useState('');
   const [searchConsultant, setSearchConsultant] = useState('');
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({ key: '', direction: 'asc' });
 
   const fetchCustomers = async () => {
     setIsLoading(true);
@@ -120,6 +123,30 @@ const Customers: React.FC<CustomersProps> = ({ role, language, userId, userName,
     fetchCustomers();
   }, [role, userId]);
 
+  const handleSort = (key: string) => {
+    setSortConfig(current => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const sortedCustomers = React.useMemo(() => {
+    if (!sortConfig.key) return customers;
+
+    return [...customers].sort((a, b) => {
+      let aVal = '';
+      let bVal = '';
+
+      if (sortConfig.key === 'name') { aVal = a.name?.toLowerCase() || ''; bVal = b.name?.toLowerCase() || ''; }
+      else if (sortConfig.key === 'executive') { aVal = a.executive?.name?.toLowerCase() || ''; bVal = b.executive?.name?.toLowerCase() || ''; }
+      else if (sortConfig.key === 'status') { aVal = a.status?.toLowerCase() || ''; bVal = b.status?.toLowerCase() || ''; }
+
+      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [customers, sortConfig]);
+
   useEffect(() => {
     if (initialOpenId && customers.length > 0) {
       if (openTimestamp && openTimestamp !== handledTimestamp) {
@@ -136,10 +163,19 @@ const Customers: React.FC<CustomersProps> = ({ role, language, userId, userName,
         }
       }
     }
-  }, [initialOpenId, customers, handledInitialId, openTimestamp, handledTimestamp]);
 
-  const handleOpenModal = (customer: Customer | null = null) => {
+    if (pendingOpenId && customers.length > 0) {
+      const target = customers.find(c => c.id.toString() === pendingOpenId.toString());
+      if (target) {
+        handleOpenModal(target, 2);
+        setPendingOpenId(null);
+      }
+    }
+  }, [initialOpenId, customers, handledInitialId, openTimestamp, handledTimestamp, pendingOpenId]);
+
+  const handleOpenModal = (customer: Customer | null = null, tabIndex: number = 0) => {
     setSelectedCustomer(customer);
+    setModalTab(tabIndex);
     setShowModal(true);
   };
 
@@ -148,9 +184,12 @@ const Customers: React.FC<CustomersProps> = ({ role, language, userId, userName,
     setShowExecutiveModal(true);
   };
 
-  const handleModalSuccess = () => {
+  const handleModalSuccess = (data?: { id: string, isNew: boolean }) => {
     setShowModal(false);
     fetchCustomers();
+    if (data?.isNew && data.id) {
+      setPendingOpenId(data.id.toString());
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -217,16 +256,31 @@ const Customers: React.FC<CustomersProps> = ({ role, language, userId, userName,
           <table className="w-full text-left border-collapse min-w-[600px]">
             <thead>
               <tr className="bg-gray-50/50 border-b border-gray-100">
-                <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t.name}</th>
+                <th onClick={() => handleSort('name')} className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider cursor-pointer hover:text-secondary select-none group">
+                  <div className="flex items-center gap-1">
+                    {t.name}
+                    {sortConfig.key === 'name' && <span className="text-[8px]">{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>}
+                  </div>
+                </th>
                 <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t.document}</th>
                 {role === UserRole.HEAD && (
-                   <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Executivo</th>
+                   <th onClick={() => handleSort('executive')} className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider cursor-pointer hover:text-secondary select-none group">
+                     <div className="flex items-center gap-1">
+                       Executivo
+                       {sortConfig.key === 'executive' && <span className="text-[8px]">{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>}
+                     </div>
+                   </th>
                 )}
-                <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">{t.status}</th>
+                <th onClick={() => handleSort('status')} className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right cursor-pointer hover:text-secondary select-none group">
+                  <div className="flex items-center justify-end gap-1">
+                    {t.status}
+                    {sortConfig.key === 'status' && <span className="text-[8px]">{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>}
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {customers.map(customer => (
+              {sortedCustomers.map(customer => (
                 <tr key={customer.id} className="hover:bg-gray-50/50 transition-colors">
                   <td className="px-6 py-4 text-secondary font-normal">
                     <button onClick={() => handleOpenModal(customer)} className="font-bold hover:text-primary hover:underline text-left">
@@ -278,6 +332,7 @@ const Customers: React.FC<CustomersProps> = ({ role, language, userId, userName,
           userRole={role}
           currentUserId={userId}
           currentUserName={userName}
+          initialTab={modalTab}
         />
       )}
 

@@ -10,6 +10,7 @@ export interface UploadedDocument {
   name: string;
   date: string;
   status: 'Ativo' | 'Pendente' | 'Rejeitado';
+  statusId?: number;
   url: string;
   filePath: string;
 }
@@ -20,10 +21,12 @@ interface DocumentsTabProps {
   setSelectedDocType: (val: string) => void;
   isReadOnly: boolean;
   onFileUpload: (file: File) => Promise<void>;
+  onUpdateStatus?: (doc: UploadedDocument, newStatus: number) => Promise<void>;
   onDeleteDocument: (doc: UploadedDocument) => Promise<void>;
   userRole?: UserRole;
   fileInputRef: React.RefObject<HTMLInputElement>;
   acceptedExtensions: string[];
+  allowContractUpload?: boolean;
 }
 
 const DocumentsTab: React.FC<DocumentsTabProps> = ({
@@ -32,10 +35,12 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({
   setSelectedDocType,
   isReadOnly,
   onFileUpload,
+  onUpdateStatus,
   onDeleteDocument,
   userRole,
   fileInputRef,
-  acceptedExtensions
+  acceptedExtensions,
+  allowContractUpload = true
 }) => {
   // Estado local visual (o pai não precisa saber se está arrastando)
   const [isDragging, setIsDragging] = useState(false);
@@ -104,6 +109,11 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({
             <optgroup label="Comprovante de Residência * Obrigatório">
               <option value="Residencia">Comprovante de Residência</option>
             </optgroup>
+            {allowContractUpload && (
+              <optgroup label="Contratos e Outros">
+                <option value="Contrato">Contrato Assinado</option>
+              </optgroup>
+            )}
           </select>
           <button 
             onClick={() => fileInputRef.current?.click()} 
@@ -136,9 +146,26 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({
                     <td className="px-6 py-4 text-xs font-black text-secondary">{doc.type}</td>
                     <td className="px-6 py-4 text-[11px] text-bodyText font-bold text-secondary">{doc.name}</td>
                     <td className="px-6 py-4">
-                      <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase border ${doc.status === 'Ativo' ? 'bg-green-100 text-green-700 border-green-200' : doc.status === 'Rejeitado' ? 'bg-red-100 text-red-700 border-red-200' : 'bg-orange-100 text-orange-700 border-orange-200'}`}>
-                        {doc.status}
-                      </span>
+                      {userRole === UserRole.HEAD ? (
+                        <select
+                          value={doc.statusId ?? (doc.status === 'Ativo' ? 2 : doc.status === 'Rejeitado' ? 3 : 1)}
+                          onChange={(e) => onUpdateStatus && onUpdateStatus(doc, Number(e.target.value))}
+                          className={`px-2 py-1 rounded text-[9px] font-black uppercase border outline-none cursor-pointer appearance-none text-center min-w-[80px] ${
+                            (doc.statusId === 2 || doc.status === 'Ativo') ? 'bg-green-100 text-green-700 border-green-200' : 
+                            (doc.statusId === 3 || doc.status === 'Rejeitado') ? 'bg-red-100 text-red-700 border-red-200' : 
+                            'bg-orange-100 text-orange-700 border-orange-200'
+                          }`}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <option value={1}>Pendente</option>
+                          <option value={2}>Aprovado</option>
+                          <option value={3}>Rejeitado</option>
+                        </select>
+                      ) : (
+                        <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase border ${doc.status === 'Ativo' ? 'bg-green-100 text-green-700 border-green-200' : doc.status === 'Rejeitado' ? 'bg-red-100 text-red-700 border-red-200' : 'bg-orange-100 text-orange-700 border-orange-200'}`}>
+                          {doc.status}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <button onClick={() => window.open(doc.url, '_blank')} className="p-2 text-secondary hover:bg-secondary/10 rounded-xl transition-all mr-2" title="Visualizar">

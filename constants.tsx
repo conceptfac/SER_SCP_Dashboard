@@ -372,7 +372,8 @@ export const DOC_TYPE_MAP: Record<number, string> = {
   3: 'CNH',
   4: 'CIN',
   5: 'Passaporte',
-  6: 'Comprovante de Residência'
+  6: 'Comprovante de Residência',
+  7: 'Contrato'
 };
 
 export const DOC_STATUS_MAP: Record<number, 'Ativo' | 'Pendente' | 'Rejeitado'> = {
@@ -388,7 +389,8 @@ export const DOC_VALUE_TO_ID: Record<string, number> = {
   'CNH': 3,
   'CIN': 4,
   'Passaporte': 5,
-  'Residencia': 6
+  'Residencia': 6,
+  'Contrato': 7
 };
 
 export const ACCEPTED_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.doc', '.docx', '.xls', '.xlsx', '.pdf', '.ppt', '.pptx', '.txt'];

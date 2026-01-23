@@ -25,7 +25,8 @@ interface BankAccountCardProps {
 }
 
 const BankAccountCard: React.FC<BankAccountCardProps> = ({ account, onToggle, onDelete, onEdit }) => {
-  const iconName = `BankIcon${account.bankCode.trim()}`;
+  const effectiveBankCode = account.type === 'Pix' ? '0' : account.bankCode;
+  const iconName = `BankIcon${effectiveBankCode.trim()}`;
   const iconData = (bankIconsAtlas.frames as any)[iconName];
   const scale = 56 / 64; // Container é w-14 (56px), ícone original é 64px
 
@@ -46,11 +47,11 @@ const BankAccountCard: React.FC<BankAccountCardProps> = ({ account, onToggle, on
               title={account.bankName}
             />
           ) : (
-            account.bankCode
+            effectiveBankCode
           )}
         </div>
         <div>
-          <p className="text-sm font-black text-secondary uppercase tracking-tight">{account.bankName}</p>
+          <p className="text-sm font-black text-secondary uppercase tracking-tight">{account.type === 'Pix' ? 'Chave Pix' : account.bankName}</p>
           {account.type !== 'Pix' && (
             <p className="text-[10px] font-bold text-gray-400 uppercase mt-1 tracking-widest">AG: {account.agency} | CC: {account.account}-{account.digit} | {account.type}</p>
           )}

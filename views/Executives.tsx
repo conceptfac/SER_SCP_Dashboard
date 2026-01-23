@@ -35,6 +35,7 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language, userId }) => {
   const [searchName, setSearchName] = useState('');
   const [searchDocument, setSearchDocument] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({ key: '', direction: 'asc' });
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -96,6 +97,30 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language, userId }) => {
     fetchExecutives();
   }, []);
 
+  const handleSort = (key: string) => {
+    setSortConfig(current => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const sortedExecutives = React.useMemo(() => {
+    if (!sortConfig.key) return executivesList;
+
+    return [...executivesList].sort((a, b) => {
+      let aVal = '';
+      let bVal = '';
+
+      if (sortConfig.key === 'name') { aVal = a.name?.toLowerCase() || ''; bVal = b.name?.toLowerCase() || ''; }
+      else if (sortConfig.key === 'role') { aVal = a.role?.toLowerCase() || ''; bVal = b.role?.toLowerCase() || ''; }
+      else if (sortConfig.key === 'status') { aVal = a.status?.toLowerCase() || ''; bVal = b.status?.toLowerCase() || ''; }
+
+      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [executivesList, sortConfig]);
+
   const handleOpenModal = (exec: ExecutiveDisplay | null = null) => {
     setSelectedExec(exec);
     setShowModal(true);
@@ -147,13 +172,28 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language, userId }) => {
           <table className="w-full text-left border-collapse min-w-[600px]">
             <thead>
               <tr className="bg-gray-50/50 border-b border-gray-100">
-                <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t.name}</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t.role}</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">{t.status}</th>
+                <th onClick={() => handleSort('name')} className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider cursor-pointer hover:text-secondary select-none group">
+                  <div className="flex items-center gap-1">
+                    {t.name}
+                    {sortConfig.key === 'name' && <span className="text-[8px]">{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>}
+                  </div>
+                </th>
+                <th onClick={() => handleSort('role')} className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider cursor-pointer hover:text-secondary select-none group">
+                  <div className="flex items-center gap-1">
+                    {t.role}
+                    {sortConfig.key === 'role' && <span className="text-[8px]">{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>}
+                  </div>
+                </th>
+                <th onClick={() => handleSort('status')} className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right cursor-pointer hover:text-secondary select-none group">
+                  <div className="flex items-center justify-end gap-1">
+                    {t.status}
+                    {sortConfig.key === 'status' && <span className="text-[8px]">{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>}
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {executivesList.map(exec => (
+              {sortedExecutives.map(exec => (
                 <tr key={exec.id} className="hover:bg-gray-50/50 transition-colors group">
                   <td className="px-6 py-4 text-secondary font-normal">
                     <button onClick={() => handleOpenModal(exec)} className="font-bold hover:text-primary hover:underline text-left">

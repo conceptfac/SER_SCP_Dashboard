@@ -4,7 +4,8 @@ CREATE TYPE public.notification_type_enum AS ENUM (
   'archive_contract',
   'withdrawal_request',
   'scp_info',
-  'generic'
+  'generic',
+  'new_registration_analysis'
 );
 
 CREATE TYPE public.notification_status_enum AS ENUM (
