@@ -60,7 +60,15 @@ const Sidebar: React.FC<SidebarProps> = ({ role, language, onNavigate, activeVie
     }
   ];
 
-  const filteredItems = menuItems.filter(item => !item.role || item.role.includes(role));
+  // Filtra os itens permitidos
+  let filteredItems = menuItems.filter(item => !item.role || item.role.includes(role));
+
+  // Se for CLIENTE, move 'investments' (Contratos) para o topo da lista
+  if (role === UserRole.CLIENTE) {
+    const investmentsItem = filteredItems.find(i => i.id === 'investments');
+    const otherItems = filteredItems.filter(i => i.id !== 'investments');
+    if (investmentsItem) filteredItems = [investmentsItem, ...otherItems];
+  }
 
   const sidebarClasses = `
     fixed inset-y-0 left-0 z-50 w-64 bg-[#211F38] shadow-2xl transition-transform duration-300 transform 

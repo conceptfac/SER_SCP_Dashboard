@@ -130,7 +130,7 @@ const OnboardingTab: React.FC<OnboardingTabProps> = ({
                 }`}>
                   {onboardingState.step === 'aptitude' && (onboardingState.isApt ? 'Pronto para Análise' : 'Pendências de Aptidão')}
                   {onboardingState.step === 'analysis' && (
-                    onboardingState.analysisStatus === 'rejected' ? 'ANÁLISE REJEITADA' : 'Em Análise pelo HEAD'
+                    onboardingState.analysisStatus === 'rejected' ? 'ANÁLISE REJEITADA' : 'Em Análise'
                   )}
                   {onboardingState.step === 'password' && 'Aguardando Senha'}
                   {onboardingState.step === 'registration' && (
@@ -143,7 +143,7 @@ const OnboardingTab: React.FC<OnboardingTabProps> = ({
                   {onboardingState.step === 'aptitude' && !onboardingState.isApt && 'Existem pendências cadastrais que precisam ser resolvidas.'}
                   {onboardingState.step === 'aptitude' && onboardingState.isApt && 'Todos os dados obrigatórios foram preenchidos. Aguardando envio para análise.'}
                   
-                  {onboardingState.step === 'analysis' && onboardingState.analysisStatus !== 'rejected' && 'O cadastro está sob análise de um HEAD.'}
+                  {onboardingState.step === 'analysis' && onboardingState.analysisStatus !== 'rejected' && 'O cadastro está em avaliação pelo setor comercial, responsável pelo processo.'}
                   {onboardingState.step === 'analysis' && onboardingState.analysisStatus === 'rejected' && (
                       <div className="mt-2 text-red-600 font-bold">
                           Motivo: {onboardingState.analysisReason || 'Sem motivo informado.'}

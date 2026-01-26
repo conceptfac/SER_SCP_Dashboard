@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 
 interface LoginProps {
-  onLoginSuccess: () => void;
+  onLoginSuccess: (role?: number, initialView?: string) => void;
 }
 
 const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
@@ -20,6 +20,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user.email) {
         const email = session.user.email;
         try {
+          let role = 2; // Default Executivo
+          let initialView = 'dashboard';
+
           // 1. Verificar se o e-mail está pré-cadastrado (Segurança)
           const { data: execExists } = await supabase.from('executives').select('id').ilike('email', email).maybeSingle();
           const { data: custExists } = await supabase.from('customers').select('id, onboarding_step, analysis_status').ilike('email', email).maybeSingle();
@@ -30,9 +33,16 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
             return;
           }
 
+          if (execExists) {
+             const { data: execData } = await supabase.from('executives').select('role').eq('id', execExists.id).single();
+             if (execData) role = execData.role;
+          }
+
           // 2. Se for cliente, atualizar status de onboarding (Login Social conta como validação)
           // Nota: O Trigger no banco de dados (migration_trigger_update_onboarding.sql) também faz isso por segurança
           if (custExists) {
+             role = 4; // UserRole.CLIENTE
+             initialView = 'contracts'; // Define Contratos como tela inicial
              const updates: any = { has_password: true };
              if (custExists.onboarding_step === 'password') {
                  updates.onboarding_step = 'registration';
@@ -44,7 +54,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
              await supabase.from('customers').update(updates).eq('id', custExists.id);
           }
 
-          onLoginSuccess();
+          onLoginSuccess(role, initialView);
         } catch (err) { console.error('Erro no processamento de login:', err); }
       }
     });

@@ -72,6 +72,7 @@ const App: React.FC = () => {
           email: custData.email,
           role: UserRole.CLIENTE
         });
+        setActiveView('contracts');
         return;
       }
 
@@ -83,6 +84,7 @@ const App: React.FC = () => {
         email: cleanEmail,
         role: UserRole.CLIENTE
       });
+      setActiveView('contracts');
     } catch (error) {
       console.error('Erro ao buscar perfil:', error);
     } finally {
@@ -130,7 +132,9 @@ const App: React.FC = () => {
   }
 
   if (!user) {
-    return <Login onLoginSuccess={() => {}} />;
+    return <Login onLoginSuccess={(role, view) => {
+      if (view) setActiveView(view);
+    }} />;
   }
 
   /* Código antigo de simulação removido */
