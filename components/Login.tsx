@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
+import logoBlue from '../imgs/logo.png';
 
 interface LoginProps {
   onLoginSuccess: (role?: number, initialView?: string) => void;
@@ -152,11 +153,32 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#211F38] p-4">
-      <div className="bg-white p-8 md:p-10 rounded-[2rem] shadow-2xl w-full max-w-md animate-in fade-in zoom-in-95 duration-300">
+    <>
+      <style>{`
+        .login-screen-bg { background-color: #012A4A !important; }
+        .login-surface { background-color: #FFFFFF !important; }
+        .login-surface .text-secondary { color: #102C65 !important; }
+        .login-surface .text-gray-600 { color: #4B5563 !important; }
+        .login-surface .text-gray-400 { color: #7E8EAE !important; }
+        .login-surface .text-white { color: #FFFFFF !important; }
+        .login-surface .bg-white { background-color: #FFFFFF !important; }
+        .login-surface .bg-gray-50,
+        .login-surface .bg-gray-50\\/30,
+        .login-surface .bg-gray-50\\/50,
+        .login-surface .bg-gray-50\\/80 { background-color: #F9FAFB !important; }
+        .login-surface input,
+        .login-surface select,
+        .login-surface textarea {
+          background-color: #F9FAFB !important;
+          color: #102C65 !important;
+          border-color: #E5E7EB !important;
+        }
+      `}</style>
+      <div className="login-screen-bg min-h-screen flex items-center justify-center p-4">
+      <div className="login-surface bg-white p-8 md:p-10 rounded-[2rem] shadow-2xl w-full max-w-md animate-in fade-in zoom-in-95 duration-300">
         <div className="text-center mb-8">
            <img 
-            src="https://raw.githubusercontent.com/conceptfac/SER_SCP_Dashboard/main/imgs/logo.svg" 
+            src={logoBlue} 
             alt="Logo SCP" 
             className="h-12 mx-auto mb-6"
             onError={(e) => { e.currentTarget.style.display = 'none'; }}
@@ -253,6 +275,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         )}
       </div>
     </div>
+    </>
   );
 };
 

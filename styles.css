@@ -301,4 +301,57 @@ input::placeholder, textarea::placeholder {
   .ser-table tbody .ser-table-row:nth-child(even) {
     background-color: #0F2238 !important;
   }
+
+  /* Keep login prompt in light surface even when system is dark */
+  .login-light-surface {
+    background-color: #FFFFFF !important;
+  }
+
+  .login-light-surface h1,
+  .login-light-surface h2,
+  .login-light-surface h3,
+  .login-light-surface h4,
+  .login-light-surface h5,
+  .login-light-surface h6,
+  .login-light-surface .text-secondary {
+    color: #102C65 !important;
+  }
+
+  .login-light-surface .text-gray-400 {
+    color: #7E8EAE !important;
+  }
+
+  .login-light-surface .text-gray-600 {
+    color: #4B5563 !important;
+  }
+
+  .login-light-surface .bg-white {
+    background-color: #FFFFFF !important;
+  }
+
+  .login-light-surface .bg-gray-50,
+  .login-light-surface .bg-gray-50\/30,
+  .login-light-surface .bg-gray-50\/50,
+  .login-light-surface .bg-gray-50\/80 {
+    background-color: #F9FAFB !important;
+  }
+
+  .login-light-surface .border-gray-50,
+  .login-light-surface .border-gray-100,
+  .login-light-surface .border-gray-200 {
+    border-color: #E5E7EB !important;
+  }
+
+  .login-light-surface input,
+  .login-light-surface select,
+  .login-light-surface textarea {
+    color: #102C65 !important;
+    background-color: #F9FAFB !important;
+    border-color: #E5E7EB !important;
+  }
+
+  .login-light-surface input::placeholder,
+  .login-light-surface textarea::placeholder {
+    color: #9CA3AF !important;
+  }
 }
