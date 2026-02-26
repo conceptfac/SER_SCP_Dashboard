@@ -3,13 +3,46 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <script>
+    (function () {
+      var media = window.matchMedia('(prefers-color-scheme: dark)');
+      var applyTheme = function () {
+        document.documentElement.setAttribute('data-theme', media.matches ? 'dark' : 'light');
+      };
+      applyTheme();
+      if (media.addEventListener) media.addEventListener('change', applyTheme);
+      else if (media.addListener) media.addListener(applyTheme);
+    })();
+  </script>
+  <script>
+    (function () {
+      const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+      if (!isLocalhost || !('serviceWorker' in navigator)) return;
+      if (sessionStorage.getItem('sw_localhost_cleaned') === '1') return;
+
+      Promise.all([
+        navigator.serviceWorker.getRegistrations().then(function (registrations) {
+          return Promise.all(registrations.map(function (r) { return r.unregister(); }));
+        }),
+        ('caches' in window)
+          ? caches.keys().then(function (names) { return Promise.all(names.map(function (n) { return caches.delete(n); })); })
+          : Promise.resolve()
+      ]).finally(function () {
+        sessionStorage.setItem('sw_localhost_cleaned', '1');
+        location.reload();
+      });
+    })();
+  </script>
   <title>SCP Dashboard Pro</title>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="manifest" href="/manifest.json">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700;0,800;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.0.0/css/flag-icons.min.css" />
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="/styles.css?v=20260223-2">
   <script>
     tailwind.config = {
       theme: {
@@ -43,7 +76,6 @@
   }
 }
 </script>
-<link rel="stylesheet" href="/index.css">
 </head>
 <body class="bg-white">
   <div id="root"></div>

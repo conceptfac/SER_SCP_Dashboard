@@ -8,7 +8,13 @@
   --e-global-color-white: #FFFFFF;
   --e-global-color-background: #F8FAFC;
   --e-global-color-light-gray: #F1F5F9;
-  color-scheme: light !important;
+  color-scheme: light dark;
+}
+
+html[data-theme='dark'] {
+  --e-global-color-text: #9AA8C5;
+  --e-global-color-background: #0F1626;
+  --e-global-color-light-gray: #1C2538;
 }
 
 /* 1. SCROLLBARS */
@@ -54,6 +60,16 @@ body {
   background-color: var(--e-global-color-background);
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+}
+
+html, body {
+  background-color: var(--e-global-color-background) !important;
+}
+
+html[data-theme='dark'],
+html[data-theme='dark'] body {
+  background-color: #0F1626 !important;
+  color: #E6EDF8 !important;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -142,4 +158,147 @@ input::placeholder, textarea::placeholder {
 }
 .btn-secondary-style:hover {
   opacity: 0.9;
+}
+
+/* 5. TABLE ZEBRA + CONSISTENT DIVIDERS */
+.ser-table tbody .ser-table-row {
+  border-bottom: 1px solid #E2E8F0;
+}
+
+.ser-table tbody .ser-table-row:nth-child(odd) {
+  background-color: #FFFFFF;
+}
+
+.ser-table tbody .ser-table-row:nth-child(even) {
+  background-color: #F8FAFC;
+}
+
+.ser-table tbody .ser-table-row:last-child {
+  border-bottom: 0;
+}
+
+/* 6. AUTO DARK MODE (browser/system preference) */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --e-global-color-text: #9AA8C5;
+    --e-global-color-background: #0F1626;
+    --e-global-color-light-gray: #1C2538;
+  }
+
+  html, body {
+    background-color: #0F1626 !important;
+    color: #E6EDF8 !important;
+  }
+
+  h1, h2, h3, h4, h5, h6,
+  .text-secondary {
+    color: #E6EDF8 !important;
+  }
+
+  .text-bodyText,
+  .text-gray-400 {
+    color: #9AA8C5 !important;
+  }
+
+  .text-gray-600 {
+    color: #C2CCE0 !important;
+  }
+
+  .bg-white,
+  .bg-gray-50,
+  .bg-gray-50\/30,
+  .bg-gray-50\/50,
+  .bg-gray-50\/80 {
+    background-color: #111B2E !important;
+  }
+
+  .bg-gray-100,
+  .bg-gray-200 {
+    background-color: #1A253A !important;
+  }
+
+  .hover\:bg-gray-50:hover,
+  .hover\:bg-gray-100:hover,
+  .hover\:bg-gray-200:hover,
+  .hover\:bg-gray-50\/50:hover {
+    background-color: #1F2B42 !important;
+  }
+
+  .border-gray-50,
+  .border-gray-100,
+  .border-gray-200 {
+    border-color: #27344D !important;
+  }
+
+  .shadow-sm,
+  .shadow-lg,
+  .shadow-xl,
+  .shadow-2xl,
+  .shadow-inner {
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35) !important;
+  }
+
+  .btn-secondary-style {
+    background-color: #2F54A0 !important;
+    color: #FFFFFF !important;
+  }
+
+  input, select, textarea {
+    color: #E6EDF8 !important;
+    background-color: #111B2E !important;
+    border-color: #27344D !important;
+  }
+
+  input::placeholder, textarea::placeholder {
+    color: #7F90B0 !important;
+  }
+
+  .bg-red-50,
+  .hover\:bg-red-50:hover {
+    background-color: #341B22 !important;
+  }
+
+  .bg-green-50,
+  .hover\:bg-green-50:hover {
+    background-color: #153125 !important;
+  }
+
+  .bg-blue-50\/30 {
+    background-color: rgba(29, 78, 216, 0.20) !important;
+  }
+
+  .bg-black\/50,
+  .bg-black\/60 {
+    background-color: rgba(0, 0, 0, 0.60) !important;
+  }
+
+  *::-webkit-scrollbar,
+  body::-webkit-scrollbar,
+  div::-webkit-scrollbar,
+  section::-webkit-scrollbar {
+    background-color: #101826 !important;
+  }
+
+  *::-webkit-scrollbar-track,
+  body::-webkit-scrollbar-track {
+    background: #101826 !important;
+  }
+
+  *::-webkit-scrollbar-thumb,
+  body::-webkit-scrollbar-thumb {
+    background-color: #2F54A0 !important;
+    border: 2px solid #101826 !important;
+  }
+
+  .ser-table tbody .ser-table-row {
+    border-bottom: 1px solid #27344D !important;
+  }
+
+  .ser-table tbody .ser-table-row:nth-child(odd) {
+    background-color: #111B2E !important;
+  }
+
+  .ser-table tbody .ser-table-row:nth-child(even) {
+    background-color: #0F2238 !important;
+  }
 }

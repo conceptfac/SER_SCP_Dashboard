@@ -14,3 +14,14 @@ root.render(
     <App />
   </React.StrictMode>
 );
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (isLocalhost) return;
+
+    navigator.serviceWorker.register('/sw.js').catch((error) => {
+      console.error('Falha ao registrar Service Worker:', error);
+    });
+  });
+}

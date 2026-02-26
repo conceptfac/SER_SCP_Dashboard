@@ -134,7 +134,7 @@ const Contracts: React.FC<ContractsProps> = ({ role, language }) => {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
-        <table className="w-full text-left border-collapse min-w-[1000px]">
+        <table className="ser-table w-full text-left border-collapse min-w-[1000px]">
           <thead>
             <tr className="bg-gray-50/50 border-b border-gray-100 font-display">
               <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">{t.number}</th>
@@ -177,9 +177,9 @@ const Contracts: React.FC<ContractsProps> = ({ role, language }) => {
               <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">{t.actions}</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-50">
+          <tbody>
             {sortedContracts.map(contract => (
-              <tr key={contract.id} className="hover:bg-gray-50/50 transition-colors">
+              <tr key={contract.id} className="ser-table-row hover:bg-gray-50/50 transition-colors">
                 <td className="px-6 py-4 text-secondary font-normal">{contract.number}</td>
                 <td className="px-6 py-4">
                   <span className={`px-3 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider bg-green-100 text-green-700 border-green-200`}>

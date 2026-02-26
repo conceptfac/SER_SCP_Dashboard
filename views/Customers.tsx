@@ -253,7 +253,7 @@ const Customers: React.FC<CustomersProps> = ({ role, language, userId, userName,
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[600px]">
+          <table className="ser-table w-full text-left border-collapse min-w-[600px]">
             <thead>
               <tr className="bg-gray-50/50 border-b border-gray-100">
                 <th onClick={() => handleSort('name')} className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider cursor-pointer hover:text-secondary select-none group">
@@ -279,9 +279,9 @@ const Customers: React.FC<CustomersProps> = ({ role, language, userId, userName,
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody>
               {sortedCustomers.map(customer => (
-                <tr key={customer.id} className="hover:bg-gray-50/50 transition-colors">
+                <tr key={customer.id} className="ser-table-row hover:bg-gray-50/50 transition-colors">
                   <td className="px-6 py-4 text-secondary font-normal">
                     <button onClick={() => handleOpenModal(customer)} className="font-bold hover:text-primary hover:underline text-left">
                       {customer.name}
@@ -310,7 +310,7 @@ const Customers: React.FC<CustomersProps> = ({ role, language, userId, userName,
                 </tr>
               ))}
               {customers.length === 0 && !isLoading && (
-                <tr>
+                <tr className="ser-table-row">
                   <td colSpan={4} className="px-6 py-8 text-center text-gray-400 text-sm">
                     Nenhum cliente encontrado.
                   </td>

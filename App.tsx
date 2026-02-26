@@ -10,6 +10,7 @@ import SCPInfoView from './views/SCPInfo';
 import Contracts from './views/Contracts';
 import Executives from './views/Executives';
 import Login from './components/Login';
+import InstallPWA from './components/InstallPWA';
 import { TRANSLATIONS } from './constants';
 
 const App: React.FC = () => {
@@ -122,7 +123,7 @@ const App: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-[#211F38] font-sans">
+      <div className="h-screen w-screen flex items-center justify-center bg-[#012A4A] font-sans">
         <div className="flex flex-col items-center gap-4">
           <div className="loading-spinner"></div>
           <p className="text-white font-bold tracking-widest uppercase text-xs">Carregando SER Dashboard...</p>
@@ -132,9 +133,14 @@ const App: React.FC = () => {
   }
 
   if (!user) {
-    return <Login onLoginSuccess={(role, view) => {
-      if (view) setActiveView(view);
-    }} />;
+    return (
+      <>
+        <Login onLoginSuccess={(role, view) => {
+          if (view) setActiveView(view);
+        }} />
+        <InstallPWA />
+      </>
+    );
   }
 
   /* Código antigo de simulação removido */
@@ -227,6 +233,7 @@ const App: React.FC = () => {
           </div>
         </main>
       </div>
+      <InstallPWA />
     </div>
   );
 };

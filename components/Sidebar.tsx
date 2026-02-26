@@ -71,7 +71,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, language, onNavigate, activeVie
   }
 
   const sidebarClasses = `
-    fixed inset-y-0 left-0 z-50 w-64 bg-[#211F38] shadow-2xl transition-transform duration-300 transform 
+    fixed inset-y-0 left-0 z-50 w-64 bg-[#012A4A] shadow-2xl transition-transform duration-300 transform 
     lg:translate-x-0 lg:static lg:inset-auto
     ${isOpen ? 'translate-x-0' : '-translate-x-full'}
   `;

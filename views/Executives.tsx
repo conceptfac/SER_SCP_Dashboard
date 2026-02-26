@@ -169,7 +169,7 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language, userId }) => {
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[600px]">
+          <table className="ser-table w-full text-left border-collapse min-w-[600px]">
             <thead>
               <tr className="bg-gray-50/50 border-b border-gray-100">
                 <th onClick={() => handleSort('name')} className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider cursor-pointer hover:text-secondary select-none group">
@@ -192,9 +192,9 @@ const Executives: React.FC<ExecutivesProps> = ({ role, language, userId }) => {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody>
               {sortedExecutives.map(exec => (
-                <tr key={exec.id} className="hover:bg-gray-50/50 transition-colors group">
+                <tr key={exec.id} className="ser-table-row hover:bg-gray-50/50 transition-colors group">
                   <td className="px-6 py-4 text-secondary font-normal">
                     <button onClick={() => handleOpenModal(exec)} className="font-bold hover:text-primary hover:underline text-left">
                       {exec.name}

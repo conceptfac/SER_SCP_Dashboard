@@ -1,0 +1,110 @@
+# Context: Modern Web Development (4you Platform)
+This is a **full-stack TypeScript project** with a React frontend and a Node.js backend.
+The platform uses **Supabase** for authentication, database, and storage.
+
+It must be deployable to **Vercel** or **Hostinger** without environment-specific hacks.
+
+---
+
+## Frontend Stack: React & Vite
+- **Framework:** React 18+ with TypeScript.
+- **Build Tool:** Vite.
+- **Styling:** Tailwind CSS (prefer utility classes over CSS-in-JS).
+- **Icons:** Lucide React (standardize icon usage).
+
+### Frontend Rules
+- Use **functional components with arrow functions** only.
+- Prefer **custom hooks** for non-trivial logic.
+- Avoid prop-drilling; prefer context providers when state is shared across multiple layers.
+- Use `React.memo`, `useMemo`, and `useCallback` **only when a real performance bottleneck is identified**.
+- Implement **Error Boundaries** for critical UI paths.
+- Validate external data with **Zod** or equivalent schema validation.
+
+---
+
+## Backend & Database: Supabase
+- **Service:** Supabase (Auth, Database, Storage).
+- **Client:** Always use the official **Supabase JS Client**.
+- **Security:**
+  - Always consider **Row-Level Security (RLS)** when suggesting or modifying database queries.
+  - Never bypass RLS in production code.
+- **Storage:**
+  - Use **Supabase Buckets** for media files.
+  - Enforce proper **MIME types** and file size limits.
+  - Never trust client-side validation alone.
+
+---
+
+## TypeScript & Environment Rules
+- **Strict Mode:** Always use `strict: true` in `tsconfig.json`.
+- **No JavaScript:** Never generate plain `.js` files — always use `.ts` or `.tsx`.
+- **Typing:**
+  - Avoid `any` and implicit `unknown`.
+  - Prefer **explicit return types** on public and exported functions.
+- **Node Types:**
+  - Use `@types/node` for any config or runtime files (`vite.config.ts`, scripts, tooling).
+- **Imports:**
+  - Prefer **absolute imports** (e.g., `@/components/...`) when configured in `tsconfig`.
+- **Dependencies:**
+  - Always use **npm** as the package manager (no yarn or pnpm).
+
+---
+
+## Architecture & Refactoring Rules (Node.js & TypeScript)
+
+These rules apply whenever refactoring, generating, or modifying backend or shared TypeScript code.
+
+### Architecture
+- Follow **Clean Architecture** principles.
+- Enforce clear separation of concerns between:
+  - **domain** → business logic, entities, value objects, interfaces
+  - **services** → application use cases, orchestration, workflows
+  - **controllers** → HTTP / transport layer adapters
+  - **routes** → framework-specific routing only
+- Domain layer must be **framework-agnostic** (no Express, no Supabase client, no HTTP concepts).
+
+---
+
+### Code Style & Formatting
+- **Maximum line width:** 120 columns per line.
+- **One responsibility per file.**
+- **Function size limit:** Do not create functions longer than **40 lines**.
+- Enforce **ESLint (Airbnb base)**.
+- Enforce **Prettier** for all formatting.
+- Prefer **named exports** over default exports for shared modules.
+
+---
+
+### Type Safety & API Design
+- Use **DTOs** for data crossing layer boundaries.
+- Never expose database models directly to controllers or clients.
+- Prefer **readonly** types for domain entities where mutation is not required.
+- Validate all external input at the **boundary layer** (controllers or API handlers).
+
+---
+
+### Performance & Reliability
+- Avoid blocking operations in request handlers.
+- Prefer async/await over raw promise chains.
+- Cache expensive queries where appropriate (but never cache authenticated user data globally).
+- Log errors with structured logging (JSON-friendly format).
+
+---
+
+## Refactoring Expectations
+- Prefer **splitting files over expanding existing ones**.
+- Preserve project structure and naming conventions.
+- Do not introduce breaking API changes unless explicitly requested.
+- When refactoring:
+  - Keep commits logically grouped by concern.
+  - Do not mix formatting changes with behavioral changes unless required.
+
+---
+
+## Output Expectations
+- Code must be **production-ready**.
+- All public APIs must have **TypeScript types and JSDoc comments**.
+- Generated code must pass:
+  - TypeScript `tsc --noEmit`
+  - ESLint
+  - Prettier
